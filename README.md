@@ -12,6 +12,7 @@ Only file names, extensions and sizes are ever sent.
     make app      # build/DnDCategoriser.app (ad-hoc signed)
     make run      # build and launch
     make install  # copy to /Applications so Spotlight and Launchpad find it
+    make cert     # once: self-signed signing identity so Keychain/folder grants survive rebuilds
 
 Opening Settings: menubar tray icon → Settings…. If the menubar is too crowded to show the icon,
 Spotlight → "DnD Categoriser" → Return (or double-click the app) opens Settings while the app runs,
