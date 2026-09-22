@@ -7,3 +7,6 @@ build/
 *.cer
 *.mobileprovision
 .env
+# Internal design/planning material stays local; the folder itself is kept.
+docs/superpowers/**
+!docs/superpowers/.gitkeep

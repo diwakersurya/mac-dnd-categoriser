@@ -130,8 +130,11 @@ make run                                   # build and launch from build/
 ```
 
 Layout, request encoding, file moving and configuration are pure functions or small classes with XCTest coverage.
-The manual checklist for anything involving a real mouse is in `docs/smoke.md`. Design notes are in
-`docs/superpowers/specs/`.
+The manual checklist for anything involving a real mouse is in `docs/smoke.md`.
+
+## License
+
+MIT. See [LICENSE](LICENSE).
 
 ## Privacy in one paragraph
 
