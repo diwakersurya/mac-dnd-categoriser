@@ -74,7 +74,9 @@ struct SettingsView: View {
                 ForEach($store.config.folders) { $folder in
                     VStack(alignment: .leading, spacing: 6) {
                         HStack {
-                            TextField("Name", text: $folder.name).font(.headline)
+                            TextField("Name", text: $folder.name, prompt: Text("Name"))
+                                .labelsHidden()
+                                .font(.headline)
                             Spacer()
                             Text(folder.path.path)
                                 .font(.caption).foregroundStyle(.secondary)
@@ -91,7 +93,8 @@ struct SettingsView: View {
                             .buttonStyle(.borderless)
                             .help("Remove from shelf (folder on disk is untouched)")
                         }
-                        TextField("What belongs here? (sent to the classifier)", text: $folder.description, axis: .vertical)
+                        TextField("Description", text: $folder.description, prompt: Text("What belongs here? (sent to the classifier)"), axis: .vertical)
+                            .labelsHidden()
                             .lineLimit(1...3)
                     }
                     .padding(.vertical, 4)
