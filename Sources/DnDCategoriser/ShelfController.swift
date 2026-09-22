@@ -99,8 +99,8 @@ final class ShelfController {
     private func dragEnded() {
         guard !model.isMoving else { return } // panel stays until moves finish
         let work = DispatchWorkItem { [weak self] in
-            self?.panel.orderOut(nil)
-            self?.model.activeIndex = nil
+            guard let self else { return }
+            self.panel.dismiss(duration: 0.4) { [weak self] in self?.model.activeIndex = nil }
         }
         hideWork = work
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.25, execute: work)
@@ -134,27 +134,41 @@ final class ShelfController {
         Task.detached(priority: .userInitiated) { [weak self] in
             var failedNames: [String] = []
             for job in jobs {
-                let result = FileMover.move(job.urls, into: job.folder) { done, total in
-                    Task { @MainActor [weak self] in self?.model.setProgress(tile: job.index, done: done, total: total) }
+                let total = job.urls.count
+                // Same-volume moves are instant renames; pace the bar so each tile visibly fills (>= ~0.6 s per tile).
+                let stepNanos = UInt64(max(0.08, 0.6 / Double(total)) * 1_000_000_000)
+                var moved = 0
+                var failed = 0
+                for (i, url) in job.urls.enumerated() {
+                    let result = FileMover.move([url], into: job.folder)
+                    moved += result.moved.count
+                    failed += result.failed.count
+                    failedNames += result.failed.keys.map(\.lastPathComponent)
+                    try? await Task.sleep(nanoseconds: stepNanos)
+                    let done = i + 1
+                    await MainActor.run { [weak self] in self?.model.setProgress(tile: job.index, done: done, total: total) }
                 }
-                failedNames += result.failed.keys.map(\.lastPathComponent)
-                await MainActor.run { [weak self] in
-                    self?.model.finishMoving(tile: job.index, moved: result.moved.count, failed: result.failed.count)
-                }
+                try? await Task.sleep(nanoseconds: 150_000_000)
+                let m = moved, f = failed
+                await MainActor.run { [weak self] in self?.model.finishMoving(tile: job.index, moved: m, failed: f) }
             }
-            let failed = failedNames.sorted()
-            await MainActor.run { [weak self] in self?.movesFinished(failedNames: failed) }
+            let failedSorted = failedNames.sorted()
+            await MainActor.run { [weak self] in self?.movesFinished(failedNames: failedSorted) }
         }
         return true
     }
 
+    /// Hold the "Moved n" results for 2 s, then fade the panel out over 1 s.
     private func movesFinished(failedNames: [String]) {
         if !failedNames.isEmpty { Notifier.moveFailed(failedNames) }
         let work = DispatchWorkItem { [weak self] in
-            self?.panel.orderOut(nil)
-            self?.model.reset(folders: self?.config.config.folders ?? [], engine: self?.config.config.engine ?? .jev)
+            guard let self else { return }
+            self.panel.dismiss(duration: 1.0) { [weak self] in
+                guard let self else { return }
+                self.model.reset(folders: self.config.config.folders, engine: self.config.config.engine)
+            }
         }
         hideWork = work
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6, execute: work)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0, execute: work)
     }
 }

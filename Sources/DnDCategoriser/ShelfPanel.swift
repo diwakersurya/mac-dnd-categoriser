@@ -73,14 +73,52 @@ final class ShelfPanel: NSPanel {
 
     override var canBecomeKey: Bool { true }
 
-    /// Shelf column flush with the right edge of the screen under `pointer`, centred on the pointer's Y, clamped to the visible frame.
+    private var generation = 0
+
+    /// Shelf column flush with the right edge of the screen under `pointer`, centred on the pointer's Y, clamped to the
+    /// visible frame. First appearance fades and slides in from the edge; while visible it just re-positions.
     func show(near pointer: NSPoint, height: CGFloat) {
+        generation += 1
         let screen = NSScreen.screens.first { NSMouseInRect(pointer, $0.frame, false) } ?? NSScreen.main
         guard let visible = screen?.visibleFrame else { return }
         let width = frame.width
         var origin = NSPoint(x: visible.maxX - width - 8, y: pointer.y - height / 2)
         origin.y = min(max(origin.y, visible.minY + 8), visible.maxY - height - 8)
-        setFrame(NSRect(origin: origin, size: NSSize(width: width, height: height)), display: true)
+        let target = NSRect(origin: origin, size: NSSize(width: width, height: height))
+
+        if isVisible && alphaValue > 0.99 {
+            setFrame(target, display: true)
+            orderFrontRegardless()
+            return
+        }
+        // Cancel any in-flight fade-out, then animate in.
+        NSAnimationContext.runAnimationGroup { ctx in
+            ctx.duration = 0
+            animator().alphaValue = 0
+        }
+        setFrame(target.offsetBy(dx: 24, dy: 0), display: false)
         orderFrontRegardless()
+        NSAnimationContext.runAnimationGroup { ctx in
+            ctx.duration = 0.35
+            ctx.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            animator().alphaValue = 1
+            animator().setFrame(target, display: true)
+        }
+    }
+
+    /// Fades out over `duration`, then orders out and calls `completion`. A `show` during the fade cancels it.
+    func dismiss(duration: TimeInterval, completion: (() -> Void)? = nil) {
+        generation += 1
+        let mine = generation
+        NSAnimationContext.runAnimationGroup({ ctx in
+            ctx.duration = duration
+            ctx.timingFunction = CAMediaTimingFunction(name: .easeIn)
+            animator().alphaValue = 0
+        }, completionHandler: { [weak self] in
+            guard let self, self.generation == mine else { return }
+            self.orderOut(nil)
+            self.alphaValue = 1
+            completion?()
+        })
     }
 }

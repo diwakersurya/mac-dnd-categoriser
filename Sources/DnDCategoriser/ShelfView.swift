@@ -133,6 +133,7 @@ struct TileView: View {
                 ProgressView(value: Double(done), total: Double(max(total, 1)))
                     .progressViewStyle(.linear)
                     .controlSize(.small)
+                    .animation(.linear(duration: 0.15), value: done)
             }
         case .done(let moved, let failed):
             Text(failed == 0 ? "Moved \(moved)" : "Moved \(moved), \(failed) failed")
