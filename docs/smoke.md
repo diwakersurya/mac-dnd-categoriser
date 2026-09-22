@@ -23,3 +23,6 @@ descriptions "Supplier invoices, receipts, bills" and "Screenshots and screen re
 - [ ] Rename or delete a configured folder on disk: its tile shows "Missing folder" and is not used for classification.
 - [ ] Drag text from a browser (no file URLs): shelf does not appear.
 - [ ] Full-screen app in front: shelf still appears over it.
+- [ ] Settings → Advanced: edit the task statement; preview updates live; ↺ resets. Toggle "Size" off: `size_kb` disappears from the preview. Turn on "First 512 bytes": preview for a text file shows `snippet`.
+- [ ] Advanced → "Last drag" becomes selectable after one drag and shows those file names.
+- [ ] Advanced → enable request log, drag once, View log shows the request JSON and `f0 → folder` lines with latency.

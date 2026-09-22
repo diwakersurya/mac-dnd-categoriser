@@ -4,6 +4,7 @@ import Combine
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     let config = ConfigStore()
+    let session = SessionLog()
     private var shelf: ShelfController!
     private var statusItem: NSStatusItem!
     private var settings: SettingsWindowController!
@@ -17,8 +18,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             .sink { NSApp.setActivationPolicy($0 ? .regular : .accessory) }
             .store(in: &cancellables)
 
-        settings = SettingsWindowController(config: config)
-        shelf = ShelfController(config: config)
+        settings = SettingsWindowController(config: config, session: session)
+        shelf = ShelfController(config: config, session: session)
 
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         statusItem.button?.image = NSImage(systemSymbolName: "tray.and.arrow.down.fill", accessibilityDescription: "DnD Categoriser")

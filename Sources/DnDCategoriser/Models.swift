@@ -42,15 +42,76 @@ enum Engine: String, Codable, CaseIterable {
     case onDevice
 }
 
+/// Which per-file facts are put in the classifier payload. `name` is always sent.
+enum FileField: String, Codable, CaseIterable, Identifiable {
+    case name, ext, size, kind, created, modified, parent, snippet
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .name: return "File name"
+        case .ext: return "Extension"
+        case .size: return "Size (KB)"
+        case .kind: return "Kind (e.g. PDF document)"
+        case .created: return "Created date"
+        case .modified: return "Modified date"
+        case .parent: return "Parent folder name"
+        case .snippet: return "First 512 bytes of text content"
+        }
+    }
+
+    var warning: String? {
+        switch self {
+        case .snippet: return "Sends file content to the classifier"
+        case .parent: return "Reveals folder names from your disk"
+        default: return nil
+        }
+    }
+}
+
+/// Everything user-editable about what the classifier receives. Folder names and descriptions come from `Folder`.
+struct PayloadTemplate: Codable, Equatable {
+    static let defaultTask = "The user is dragging files onto task folders. Decide which folder each file belongs in."
+    static let defaultQuestion = "Which folder is the best home for this file?"
+    static let defaultNoneDescription = "Does not belong in any of the listed folders"
+    static let defaultModel = "jev-latest"
+    static let defaultFields: Set<FileField> = [.name, .ext, .size]
+
+    var task = defaultTask
+    var question = defaultQuestion
+    var noneDescription = defaultNoneDescription
+    var model = defaultModel
+    var timeoutSeconds: Double = 3
+    var fields = defaultFields
+
+    init() {}
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        task = try c.decodeIfPresent(String.self, forKey: .task) ?? Self.defaultTask
+        question = try c.decodeIfPresent(String.self, forKey: .question) ?? Self.defaultQuestion
+        noneDescription = try c.decodeIfPresent(String.self, forKey: .noneDescription) ?? Self.defaultNoneDescription
+        model = try c.decodeIfPresent(String.self, forKey: .model) ?? Self.defaultModel
+        timeoutSeconds = try c.decodeIfPresent(Double.self, forKey: .timeoutSeconds) ?? 3
+        fields = try c.decodeIfPresent(Set<FileField>.self, forKey: .fields) ?? Self.defaultFields
+        fields.insert(.name)
+    }
+}
+
 struct Config: Codable, Equatable {
     var folders: [Folder] = []
     var engine: Engine = .jev
     var showInDock: Bool = false
+    var payload = PayloadTemplate()
+    var logRequests: Bool = false
 
-    init(folders: [Folder] = [], engine: Engine = .jev, showInDock: Bool = false) {
+    init(folders: [Folder] = [], engine: Engine = .jev, showInDock: Bool = false,
+         payload: PayloadTemplate = PayloadTemplate(), logRequests: Bool = false) {
         self.folders = folders
         self.engine = engine
         self.showInDock = showInDock
+        self.payload = payload
+        self.logRequests = logRequests
     }
 
     /// Every key optional so a config.json written by an older build still loads.
@@ -59,6 +120,8 @@ struct Config: Codable, Equatable {
         folders = try c.decodeIfPresent([Folder].self, forKey: .folders) ?? []
         engine = try c.decodeIfPresent(Engine.self, forKey: .engine) ?? .jev
         showInDock = try c.decodeIfPresent(Bool.self, forKey: .showInDock) ?? false
+        payload = try c.decodeIfPresent(PayloadTemplate.self, forKey: .payload) ?? PayloadTemplate()
+        logRequests = try c.decodeIfPresent(Bool.self, forKey: .logRequests) ?? false
     }
 }
 

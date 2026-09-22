@@ -5,6 +5,7 @@ import Combine
 @MainActor
 final class ShelfController {
     let config: ConfigStore
+    let session: SessionLog
     let model = ShelfViewModel()
     let layout = TileLayout()
     let watcher = DragWatcher()
@@ -15,8 +16,9 @@ final class ShelfController {
     private var hideWork: DispatchWorkItem?
     private var cancellables = Set<AnyCancellable>()
 
-    init(config: ConfigStore) {
+    init(config: ConfigStore, session: SessionLog) {
         self.config = config
+        self.session = session
         panel = ShelfPanel(rootView: ShelfView(model: model, layout: layout), layout: layout)
         model.reset(folders: config.config.folders, engine: config.config.engine)
 
@@ -46,9 +48,10 @@ final class ShelfController {
     private var panelHeight: CGFloat { layout.panelHeight(tileCount: model.slotCount) }
 
     private func makeClassifier() -> Classifier {
+        let template = config.config.payload
         switch config.config.engine {
-        case .jev: return JevClassifier(apiKey: { KeychainStore.read() })
-        case .onDevice: return OnDeviceClassifier()
+        case .jev: return JevClassifier(apiKey: { KeychainStore.read() }, template: template)
+        case .onDevice: return OnDeviceClassifier(template: template)
         }
     }
 
@@ -58,6 +61,7 @@ final class ShelfController {
         classifyTask?.cancel()
 
         files = urls.enumerated().map { FileInfo(id: "f\($0.offset)", url: $0.element) }
+        session.lastFiles = files
         model.reset(folders: config.config.folders, engine: config.config.engine)
         model.beginSession()
         panel.show(near: NSEvent.mouseLocation, height: panelHeight)
@@ -65,17 +69,29 @@ final class ShelfController {
         let classifier = makeClassifier()
         let folders = model.activeFolders
         let snapshot = files
+        let engine = config.config.engine
+        let requestText = config.config.logRequests
+            ? PayloadPreview.render(engine: engine, files: snapshot, folders: folders, template: config.config.payload)
+            : nil
+        let started = Date()
         classifyTask = Task { [weak self] in
+            var responseText: String
             do {
                 let result = try await classifier.classify(files: snapshot, folders: folders)
                 guard !Task.isCancelled else { return }
                 self?.model.apply(results: result, files: snapshot)
+                responseText = result.isEmpty ? "(no file matched any folder)" : result.sorted { $0.key < $1.key }.map { "\($0.key) → \($0.value)" }.joined(separator: "\n")
             } catch let error as ClassifierError {
                 guard !Task.isCancelled else { return }
                 self?.model.fail(error.message)
+                responseText = "ERROR: \(error.message)"
             } catch {
                 guard !Task.isCancelled else { return }
                 self?.model.fail(error.localizedDescription)
+                responseText = "ERROR: \(error.localizedDescription)"
+            }
+            if let requestText {
+                self?.session.record(RequestLogEntry(date: started, engine: engine, latency: Date().timeIntervalSince(started), request: requestText, response: responseText))
             }
         }
     }

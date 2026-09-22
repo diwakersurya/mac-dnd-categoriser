@@ -4,13 +4,30 @@ import Foundation
 /// One Choice question per file; all questions share the same criteria (one key per folder + "none").
 struct JevRequest: Encodable {
     static let noneKey = "none"
-    static let noneDescription = "Does not belong in any of the listed folders"
 
+    /// Optional members encode only when present, so the template's field set controls the JSON shape.
     struct FileEntry: Encodable {
         let id: String
-        let name: String
-        let ext: String
-        let size_kb: Int64
+        var name: String?
+        var ext: String?
+        var size_kb: Int64?
+        var kind: String?
+        var created: String?
+        var modified: String?
+        var parent: String?
+        var snippet: String?
+
+        init(_ f: FileInfo, fields: Set<FileField>) {
+            id = f.id
+            name = f.name
+            if fields.contains(.ext) { ext = f.ext }
+            if fields.contains(.size) { size_kb = max(1, f.sizeBytes / 1024) }
+            if fields.contains(.kind) { kind = FileMetadata.kind(f.url) }
+            if fields.contains(.created) { created = FileMetadata.created(f.url) }
+            if fields.contains(.modified) { modified = FileMetadata.modified(f.url) }
+            if fields.contains(.parent) { parent = FileMetadata.parent(f.url) }
+            if fields.contains(.snippet) { snippet = FileMetadata.snippet(f.url) }
+        }
     }
 
     struct State: Encodable {
@@ -51,25 +68,20 @@ struct JevRequest: Encodable {
     let state: State
     let questions: [String: Question]
 
-    init(files: [FileInfo], folders: [Folder], model: String = "jev-latest") {
-        let entries = files.map {
-            FileEntry(id: $0.id, name: $0.name, ext: $0.ext, size_kb: max(1, $0.sizeBytes / 1024))
-        }
+    init(files: [FileInfo], folders: [Folder], template: PayloadTemplate = PayloadTemplate()) {
+        let entries = files.map { FileEntry($0, fields: template.fields) }
         var criteria: [String: CriterionValue] = [:]
         for folder in folders {
             criteria[folder.id] = .folder(FolderCriterion(name: folder.name, what: folder.description))
         }
-        criteria[Self.noneKey] = .text(Self.noneDescription)
+        criteria[Self.noneKey] = .text(template.noneDescription)
 
-        self.model = model
-        self.state = State(
-            task: "The user is dragging files onto task folders. Decide which folder each file belongs in.",
-            files: entries
-        )
+        self.model = template.model
+        self.state = State(task: template.task, files: entries)
         var questions: [String: Question] = [:]
         for entry in entries {
             questions[entry.id] = Question(
-                instructions: Instructions(file: entry, question: "Which folder is the best home for this file?"),
+                instructions: Instructions(file: entry, question: template.question),
                 criteria: criteria
             )
         }
@@ -90,15 +102,16 @@ struct JevResponse: Decodable {
 
 final class JevClassifier: Classifier {
     let endpoint = URL(string: "https://api.typesafe.ai/v1/systemone")!
-    var timeout: TimeInterval = 3
     var retryDelayNanos: UInt64 = 400_000_000
 
     private let apiKey: () -> String?
     private let session: URLSession
+    private let template: PayloadTemplate
 
-    init(apiKey: @escaping () -> String?, session: URLSession = .shared) {
+    init(apiKey: @escaping () -> String?, session: URLSession = .shared, template: PayloadTemplate = PayloadTemplate()) {
         self.apiKey = apiKey
         self.session = session
+        self.template = template
     }
 
     func classify(files: [FileInfo], folders: [Folder]) async throws -> [String: String] {
@@ -109,10 +122,10 @@ final class JevClassifier: Classifier {
 
         var request = URLRequest(url: endpoint)
         request.httpMethod = "POST"
-        request.timeoutInterval = timeout
+        request.timeoutInterval = max(0.5, template.timeoutSeconds)
         request.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try JSONEncoder().encode(JevRequest(files: files, folders: folders))
+        request.httpBody = try JSONEncoder().encode(JevRequest(files: files, folders: folders, template: template))
 
         let (data, status) = try await send(request, allowRetry: true)
         switch status {
