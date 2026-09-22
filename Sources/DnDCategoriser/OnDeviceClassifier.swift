@@ -41,16 +41,24 @@ final class OnDeviceClassifier: Classifier {
         let session = LanguageModelSession(instructions: instructions)
         let items: [OnDeviceAssignment]
         do {
-            items = try await session.respond(to: "Files:\n\(fileLines)", generating: OnDeviceAssignments.self).content.items
+            // Greedy sampling: classification should be deterministic, not creative.
+            items = try await session.respond(
+                to: "Files:\n\(fileLines)",
+                generating: OnDeviceAssignments.self,
+                options: GenerationOptions(sampling: .greedy)
+            ).content.items
         } catch {
             throw ClassifierError.unavailable(error.localizedDescription)
         }
 
-        let known = Set(folders.map(\.id))
+        let knownByLowercase = Dictionary(folders.map { ($0.id.lowercased(), $0.id) }, uniquingKeysWith: { a, _ in a })
         let fileIDs = Set(files.map(\.id))
         var result: [String: String] = [:]
-        for item in items where fileIDs.contains(item.fileID) && known.contains(item.folderID) {
-            result[item.fileID] = item.folderID
+        for item in items {
+            let fileID = item.fileID.trimmingCharacters(in: .whitespaces)
+            guard fileIDs.contains(fileID),
+                  let folderID = knownByLowercase[item.folderID.trimmingCharacters(in: .whitespaces).lowercased()] else { continue }
+            result[fileID] = folderID
         }
         return result
     }
