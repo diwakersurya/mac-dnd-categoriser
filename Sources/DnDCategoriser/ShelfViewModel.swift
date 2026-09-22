@@ -16,24 +16,35 @@ struct Tile: Identifiable, Equatable {
     var id: String { folder.id }
 }
 
+struct FlyoutContent: Equatable {
+    var title: String
+    var files: [FileInfo]
+}
+
+/// Slots on the shelf are the folder tiles (0..<tiles.count) plus, when some dragged files matched nothing,
+/// one trailing "No folder" slot at index tiles.count. All slots share the tile height so layout math stays fixed.
 @MainActor
 final class ShelfViewModel: ObservableObject {
     static let missingMessage = "Missing folder"
+    static let unmatchedTitle = "No folder"
 
     @Published var tiles: [Tile] = []
+    @Published var unmatched: [FileInfo] = []
     @Published var activeIndex: Int?
     @Published var flashIndex: Int?
     @Published var engineLabel: String = ""
-    var onAddFolder: (() -> Void)?
 
     /// Folders whose path exists; these are what the classifier is asked about.
     var activeFolders: [Folder] { tiles.filter { !$0.missing }.map(\.folder) }
+    var slotCount: Int { tiles.count + (unmatched.isEmpty ? 0 : 1) }
+    var unmatchedSlot: Int? { unmatched.isEmpty ? nil : tiles.count }
 
     func reset(folders: [Folder], engine: Engine) {
         tiles = folders.map { folder in
             let exists = FileManager.default.fileExists(atPath: folder.path.path)
             return Tile(folder: folder, state: exists ? .idle : .failed(Self.missingMessage), missing: !exists)
         }
+        unmatched = []
         engineLabel = engine == .jev ? "Jev" : "On-device"
         activeIndex = nil
         flashIndex = nil
@@ -41,6 +52,7 @@ final class ShelfViewModel: ObservableObject {
 
     func beginSession() {
         for i in tiles.indices where !tiles[i].missing { tiles[i].state = .pending }
+        unmatched = []
     }
 
     func apply(results: [String: String], files: [FileInfo]) {
@@ -48,15 +60,27 @@ final class ShelfViewModel: ObservableObject {
             let matched = files.filter { results[$0.id] == tiles[i].folder.id }
             tiles[i].state = matched.isEmpty ? .empty : .matches(matched)
         }
+        let assigned = Set(tiles.flatMap { tile -> [String] in
+            if case .matches(let files) = tile.state { return files.map(\.id) }
+            return []
+        })
+        unmatched = files.filter { !assigned.contains($0.id) }
     }
 
     func fail(_ message: String) {
         for i in tiles.indices where !tiles[i].missing { tiles[i].state = .failed(message) }
+        unmatched = []
     }
 
     func matchedFiles(at index: Int) -> [FileInfo]? {
         guard tiles.indices.contains(index), case .matches(let files) = tiles[index].state else { return nil }
         return files
+    }
+
+    func flyout(forSlot index: Int) -> FlyoutContent? {
+        if index == unmatchedSlot { return FlyoutContent(title: Self.unmatchedTitle, files: unmatched) }
+        guard let files = matchedFiles(at: index) else { return nil }
+        return FlyoutContent(title: tiles[index].folder.name, files: files)
     }
 
     func flash(_ index: Int) {

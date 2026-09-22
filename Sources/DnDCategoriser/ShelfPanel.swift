@@ -43,7 +43,7 @@ final class ShelfPanel: NSPanel {
     let dropView: DropHostView
 
     init(rootView: some View, layout: TileLayout) {
-        dropView = DropHostView(frame: NSRect(x: 0, y: 0, width: layout.panelWidth, height: 200))
+        dropView = DropHostView(frame: NSRect(x: 0, y: 0, width: layout.totalWidth, height: 200))
         super.init(
             contentRect: dropView.frame,
             styleMask: [.nonactivatingPanel, .borderless],
@@ -73,7 +73,7 @@ final class ShelfPanel: NSPanel {
 
     override var canBecomeKey: Bool { true }
 
-    /// Flush with the right edge of the screen under `pointer`, centred on the pointer's Y, clamped to the visible frame.
+    /// Shelf column flush with the right edge of the screen under `pointer`, centred on the pointer's Y, clamped to the visible frame.
     func show(near pointer: NSPoint, height: CGFloat) {
         let screen = NSScreen.screens.first { NSMouseInRect(pointer, $0.frame, false) } ?? NSScreen.main
         guard let visible = screen?.visibleFrame else { return }

@@ -1,17 +1,36 @@
 import SwiftUI
+import AppKit
 
 struct ShelfView: View {
     @ObservedObject var model: ShelfViewModel
     let layout: TileLayout
 
     var body: some View {
+        ZStack(alignment: .topLeading) {
+            shelfColumn.offset(x: layout.shelfX)
+
+            if let index = model.activeIndex, let content = model.flyout(forSlot: index) {
+                let f = layout.flyoutFrame(forSlot: index, slotCount: model.slotCount, rowCount: content.files.count)
+                FlyoutView(content: content, layout: layout)
+                    .frame(width: f.width, height: f.height)
+                    .offset(x: f.minX, y: f.minY)
+                    .transition(.opacity)
+            }
+        }
+        .frame(width: layout.totalWidth, height: layout.panelHeight(tileCount: model.slotCount), alignment: .topLeading)
+        .animation(.easeOut(duration: 0.12), value: model.activeIndex)
+    }
+
+    private var shelfColumn: some View {
         VStack(spacing: layout.spacing) {
             ForEach(Array(model.tiles.enumerated()), id: \.element.id) { index, tile in
                 TileView(tile: tile, active: model.activeIndex == index, flashing: model.flashIndex == index)
                     .frame(height: layout.tileHeight)
             }
-            AddTileView(active: model.activeIndex == model.tiles.count) { model.onAddFolder?() }
-                .frame(height: layout.tileHeight)
+            if let slot = model.unmatchedSlot {
+                UnmatchedTileView(count: model.unmatched.count, active: model.activeIndex == slot, flashing: model.flashIndex == slot)
+                    .frame(height: layout.tileHeight)
+            }
         }
         .padding(layout.padding)
         .frame(width: layout.panelWidth)
@@ -23,6 +42,20 @@ struct ShelfView: View {
                 .padding(.trailing, layout.padding + 4)
                 .padding(.top, 2)
         }
+    }
+}
+
+struct CountBadge: View {
+    let count: Int
+    var muted = false
+
+    var body: some View {
+        Text("\(count)")
+            .font(.caption.bold().monospacedDigit())
+            .foregroundStyle(muted ? Color.primary : Color.white)
+            .padding(.horizontal, 7)
+            .padding(.vertical, 2)
+            .background(Capsule().fill(muted ? Color.secondary.opacity(0.3) : Color.accentColor))
     }
 }
 
@@ -39,10 +72,7 @@ struct TileView: View {
                 Spacer()
                 trailing
             }
-            if !tile.folder.description.isEmpty {
-                Text(tile.folder.description).font(.caption).foregroundStyle(.secondary).lineLimit(1)
-            }
-            content
+            subtitle
         }
         .padding(10)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -52,11 +82,16 @@ struct TileView: View {
         )
         .overlay(
             RoundedRectangle(cornerRadius: 10)
-                .stroke(flashing ? Color.red : (active ? Color.accentColor : Color.clear), lineWidth: 2)
+                .stroke(borderColor, lineWidth: active || flashing ? 2 : 1.5)
         )
         .opacity(dimmed ? 0.45 : 1)
         .animation(.easeOut(duration: 0.12), value: active)
         .animation(.easeOut(duration: 0.12), value: flashing)
+    }
+
+    private var hasMatches: Bool {
+        if case .matches = tile.state { return true }
+        return false
     }
 
     private var dimmed: Bool {
@@ -64,59 +99,91 @@ struct TileView: View {
         return false
     }
 
+    private var borderColor: Color {
+        if flashing { return .red }
+        if active || hasMatches { return .accentColor }
+        return .clear
+    }
+
     @ViewBuilder private var trailing: some View {
         switch tile.state {
         case .pending: ProgressView().controlSize(.small)
-        case .matches(let files): Text("\(files.count)").font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+        case .matches(let files): CountBadge(count: files.count)
         default: EmptyView()
         }
     }
 
-    @ViewBuilder private var content: some View {
+    @ViewBuilder private var subtitle: some View {
         switch tile.state {
-        case .matches(let files):
-            if active {
-                ScrollView(.vertical, showsIndicators: false) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        ForEach(files) { Text($0.displayName).font(.caption).lineLimit(1) }
-                    }
-                }
-            } else {
-                ForEach(files.prefix(2)) { Text($0.displayName).font(.caption).lineLimit(1) }
-                if files.count > 2 {
-                    Text("+\(files.count - 2) more").font(.caption2).foregroundStyle(.secondary)
-                }
-            }
-        case .empty:
-            Text("No matching files").font(.caption).foregroundStyle(.secondary)
         case .failed(let message):
             Text(message).font(.caption).foregroundStyle(.red).lineLimit(2)
+        case .empty:
+            Text("No matching files").font(.caption).foregroundStyle(.secondary)
         case .pending:
             Text("Classifying…").font(.caption).foregroundStyle(.secondary)
-        case .idle:
-            EmptyView()
+        case .matches, .idle:
+            Text(tile.folder.description.isEmpty ? " " : tile.folder.description)
+                .font(.caption).foregroundStyle(.secondary).lineLimit(2)
         }
     }
 }
 
-struct AddTileView: View {
+/// Trailing slot for dragged files that matched no folder. Not a drop target.
+struct UnmatchedTileView: View {
+    let count: Int
     let active: Bool
-    let action: () -> Void
+    let flashing: Bool
 
     var body: some View {
-        Button(action: action) {
-            VStack(spacing: 6) {
-                Image(systemName: "plus.circle").font(.title2)
-                Text("Add folder").font(.caption)
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 6) {
+                Image(systemName: "tray")
+                Text(ShelfViewModel.unmatchedTitle).font(.headline)
+                Spacer()
+                CountBadge(count: count, muted: true)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            Text("These stay where they are").font(.caption).foregroundStyle(.secondary)
         }
-        .buttonStyle(.plain)
-        .foregroundStyle(.secondary)
-        .background(
-            RoundedRectangle(cornerRadius: 10)
-                .strokeBorder(style: StrokeStyle(lineWidth: 1.5, dash: [5, 4]))
-                .foregroundStyle(active ? Color.accentColor : Color.secondary.opacity(0.5))
-        )
+        .padding(10)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(RoundedRectangle(cornerRadius: 10).fill(active ? Color.primary.opacity(0.12) : Color.primary.opacity(0.04)))
+        .overlay(RoundedRectangle(cornerRadius: 10).stroke(flashing ? Color.red : Color.clear, lineWidth: 2))
+        .opacity(0.7)
+    }
+}
+
+struct FlyoutView: View {
+    let content: FlyoutContent
+    let layout: TileLayout
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 6) {
+                Image(systemName: "arrow.right.circle.fill").foregroundStyle(Color.accentColor)
+                Text(content.title).font(.headline).lineLimit(1)
+                Spacer()
+                Text(content.files.count == 1 ? "1 file" : "\(content.files.count) files")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            .frame(height: layout.flyoutHeaderHeight)
+            Divider()
+            ScrollView(.vertical, showsIndicators: content.files.count > layout.flyoutMaxRows) {
+                VStack(alignment: .leading, spacing: 0) {
+                    ForEach(content.files) { file in
+                        HStack(spacing: 6) {
+                            Image(nsImage: NSWorkspace.shared.icon(forFile: file.url.path))
+                                .resizable()
+                                .frame(width: 14, height: 14)
+                            Text(file.displayName).font(.caption).lineLimit(1).truncationMode(.middle)
+                        }
+                        .frame(height: layout.flyoutRowHeight)
+                    }
+                }
+            }
+        }
+        .padding(.horizontal, 10)
+        .padding(.bottom, 6)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.accentColor.opacity(0.5), lineWidth: 1))
     }
 }

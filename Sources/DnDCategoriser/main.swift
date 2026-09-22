@@ -19,7 +19,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         settings = SettingsWindowController(config: config)
         shelf = ShelfController(config: config)
-        shelf.presentAddFolder = { [weak self] in self?.settings.addFolderFlow() }
 
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         statusItem.button?.image = NSImage(systemSymbolName: "tray.and.arrow.down.fill", accessibilityDescription: "DnD Categoriser")
@@ -61,7 +60,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return main
     }
 
-    /// Double-clicking the app (or `open` on it) while it runs shows Settings; useful when the menubar is full.
+    /// Double-clicking the app, Spotlight, or the Dock icon while it runs shows Settings; useful when the menubar is full.
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         openSettings()
         return true

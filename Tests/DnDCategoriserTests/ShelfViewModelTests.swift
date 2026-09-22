@@ -56,6 +56,33 @@ final class ShelfViewModelTests: XCTestCase {
         XCTAssertNil(vm.matchedFiles(at: 5))
     }
 
+    func testApplyTracksUnmatchedFilesAsExtraSlot() {
+        let vm = ShelfViewModel()
+        vm.reset(folders: [existing], engine: .jev)
+        XCTAssertEqual(vm.slotCount, 1)
+        XCTAssertNil(vm.unmatchedSlot)
+        vm.beginSession()
+        vm.apply(results: ["f1": "docs"], files: files)
+        XCTAssertEqual(vm.unmatched, [files[0], files[2]])
+        XCTAssertEqual(vm.slotCount, 2)
+        XCTAssertEqual(vm.unmatchedSlot, 1)
+        XCTAssertEqual(vm.flyout(forSlot: 0)?.title, "Docs")
+        XCTAssertEqual(vm.flyout(forSlot: 0)?.files, [files[1]])
+        XCTAssertEqual(vm.flyout(forSlot: 1)?.title, "No folder")
+        XCTAssertEqual(vm.flyout(forSlot: 1)?.files, [files[0], files[2]])
+        XCTAssertNil(vm.flyout(forSlot: 2))
+    }
+
+    func testResetClearsUnmatched() {
+        let vm = ShelfViewModel()
+        vm.reset(folders: [existing], engine: .jev)
+        vm.apply(results: [:], files: files)
+        XCTAssertEqual(vm.unmatched.count, 3)
+        vm.reset(folders: [existing], engine: .jev)
+        XCTAssertTrue(vm.unmatched.isEmpty)
+        XCTAssertNil(vm.flyout(forSlot: 0)) // idle tile has no files
+    }
+
     func testFailMarksAllNonMissing() {
         let vm = ShelfViewModel()
         vm.reset(folders: [existing, missing], engine: .jev)

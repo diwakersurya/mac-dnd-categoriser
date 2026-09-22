@@ -8,7 +8,6 @@ final class ShelfController {
     let model = ShelfViewModel()
     let layout = TileLayout()
     let watcher = DragWatcher()
-    var presentAddFolder: (() -> Void)?
 
     private let panel: ShelfPanel
     private var files: [FileInfo] = []
@@ -20,7 +19,6 @@ final class ShelfController {
         self.config = config
         panel = ShelfPanel(rootView: ShelfView(model: model, layout: layout), layout: layout)
         model.reset(folders: config.config.folders, engine: config.config.engine)
-        model.onAddFolder = { [weak self] in self?.presentAddFolder?() }
 
         // Folder list or engine changed in Settings or via "+": rebuild tiles.
         // If a drag is in flight its results are dropped; the next drag re-classifies.
@@ -45,7 +43,7 @@ final class ShelfController {
         watcher.start()
     }
 
-    private var panelHeight: CGFloat { layout.panelHeight(tileCount: model.tiles.count + 1) }
+    private var panelHeight: CGFloat { layout.panelHeight(tileCount: model.slotCount) }
 
     private func makeClassifier() -> Classifier {
         switch config.config.engine {
@@ -90,15 +88,20 @@ final class ShelfController {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.25, execute: work)
     }
 
-    private func pointerMoved(_ point: CGPoint) {
-        model.activeIndex = layout.tileIndex(at: point, tileCount: model.tiles.count + 1)
+    /// Over the flyout column the current slot stays active, so reading the file list does not drop the highlight.
+    private func slot(at point: CGPoint) -> Int? {
+        if point.x < layout.shelfX, let current = model.activeIndex { return current }
+        return layout.tileIndex(at: point, tileCount: model.slotCount)
     }
 
-    /// Moves only the files classified for the tile under the pointer. Refuses if not ready or no matches.
+    private func pointerMoved(_ point: CGPoint) {
+        model.activeIndex = slot(at: point)
+    }
+
+    /// Moves only the files classified for the tile under the pointer. Refuses if not ready, no matches, or "No folder" slot.
     private func drop(at point: CGPoint) -> Bool {
-        guard let index = layout.tileIndex(at: point, tileCount: model.tiles.count + 1),
-              index < model.tiles.count else { return false }
-        guard let matched = model.matchedFiles(at: index) else {
+        guard let index = slot(at: point) else { return false }
+        guard index < model.tiles.count, let matched = model.matchedFiles(at: index) else {
             model.flash(index)
             return false
         }

@@ -68,7 +68,7 @@ struct SettingsView: View {
 
             Section("Folders") {
                 if store.config.folders.isEmpty {
-                    Text("No folders yet. Add one below or with the “+” tile on the shelf.")
+                    Text("No folders yet. Add one below.")
                         .foregroundStyle(.secondary)
                 }
                 ForEach($store.config.folders) { $folder in
@@ -144,9 +144,5 @@ final class SettingsWindowController {
         }
         NSApp.activate(ignoringOtherApps: true)
         window?.makeKeyAndOrderFront(nil)
-    }
-
-    func addFolderFlow() {
-        AddFolderFlow.run(store: store)
     }
 }
