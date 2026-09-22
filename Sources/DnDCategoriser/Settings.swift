@@ -80,10 +80,16 @@ struct SettingsView: View {
                                 .font(.caption).foregroundStyle(.secondary)
                                 .lineLimit(1).truncationMode(.middle)
                                 .frame(maxWidth: 200, alignment: .trailing)
+                            Button { NSWorkspace.shared.open(folder.path) } label: {
+                                Image(systemName: "folder")
+                            }
+                            .buttonStyle(.borderless)
+                            .help("Open in Finder")
                             Button(role: .destructive) { store.removeFolder(id: folder.id) } label: {
                                 Image(systemName: "trash")
                             }
                             .buttonStyle(.borderless)
+                            .help("Remove from shelf (folder on disk is untouched)")
                         }
                         TextField("What belongs here? (sent to the classifier)", text: $folder.description, axis: .vertical)
                             .lineLimit(1...3)
