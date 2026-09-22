@@ -7,6 +7,13 @@ enum TileState: Equatable {
     case matches([FileInfo])
     case empty
     case failed(String)
+    case moving(done: Int, total: Int)
+    case done(moved: Int, failed: Int)
+}
+
+struct MovePlanEntry: Equatable {
+    var index: Int
+    var files: [FileInfo]
 }
 
 struct Tile: Identifiable, Equatable {
@@ -81,6 +88,44 @@ final class ShelfViewModel: ObservableObject {
         if index == unmatchedSlot { return FlyoutContent(title: Self.unmatchedTitle, files: unmatched) }
         guard let files = matchedFiles(at: index) else { return nil }
         return FlyoutContent(title: tiles[index].folder.name, files: files)
+    }
+
+    /// Classification finished for every usable tile (no pending, no failure). Drop is accepted only then.
+    var isReady: Bool {
+        let usable = tiles.filter { !$0.missing }
+        guard !usable.isEmpty else { return false }
+        return usable.allSatisfy { tile in
+            switch tile.state {
+            case .matches, .empty, .moving, .done: return true
+            case .idle, .pending, .failed: return false
+            }
+        }
+    }
+
+    var isMoving: Bool {
+        tiles.contains { if case .moving = $0.state { return true }; return false }
+    }
+
+    var movePlan: [MovePlanEntry] {
+        tiles.indices.compactMap { i in
+            guard case .matches(let files) = tiles[i].state else { return nil }
+            return MovePlanEntry(index: i, files: files)
+        }
+    }
+
+    func beginMoving(tile index: Int, total: Int) {
+        guard tiles.indices.contains(index) else { return }
+        tiles[index].state = .moving(done: 0, total: total)
+    }
+
+    func setProgress(tile index: Int, done: Int, total: Int) {
+        guard tiles.indices.contains(index) else { return }
+        tiles[index].state = .moving(done: done, total: total)
+    }
+
+    func finishMoving(tile index: Int, moved: Int, failed: Int) {
+        guard tiles.indices.contains(index) else { return }
+        tiles[index].state = .done(moved: moved, failed: failed)
     }
 
     func flash(_ index: Int) {

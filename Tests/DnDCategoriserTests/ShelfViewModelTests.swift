@@ -83,6 +83,43 @@ final class ShelfViewModelTests: XCTestCase {
         XCTAssertNil(vm.flyout(forSlot: 0)) // idle tile has no files
     }
 
+    func testReadyAndPlanAfterClassification() {
+        let vm = ShelfViewModel()
+        let other = Folder(id: "shots", path: tmp, name: "Shots", description: "s")
+        vm.reset(folders: [existing, other, missing], engine: .jev)
+        XCTAssertFalse(vm.isReady) // idle, no session
+        vm.beginSession()
+        XCTAssertFalse(vm.isReady) // pending
+        vm.apply(results: ["f0": "docs", "f2": "docs"], files: files)
+        XCTAssertTrue(vm.isReady)
+        XCTAssertEqual(vm.movePlan.map(\.index), [0])
+        XCTAssertEqual(vm.movePlan.first?.files, [files[0], files[2]])
+    }
+
+    func testFailedClassificationIsNotReady() {
+        let vm = ShelfViewModel()
+        vm.reset(folders: [existing], engine: .jev)
+        vm.beginSession()
+        vm.fail("boom")
+        XCTAssertFalse(vm.isReady)
+        XCTAssertTrue(vm.movePlan.isEmpty)
+    }
+
+    func testMovingProgressAndFinish() {
+        let vm = ShelfViewModel()
+        vm.reset(folders: [existing], engine: .jev)
+        vm.beginSession()
+        vm.apply(results: ["f0": "docs", "f1": "docs"], files: files)
+        vm.beginMoving(tile: 0, total: 2)
+        XCTAssertEqual(vm.tiles[0].state, .moving(done: 0, total: 2))
+        XCTAssertTrue(vm.isMoving)
+        vm.setProgress(tile: 0, done: 1, total: 2)
+        XCTAssertEqual(vm.tiles[0].state, .moving(done: 1, total: 2))
+        vm.finishMoving(tile: 0, moved: 1, failed: 1)
+        XCTAssertEqual(vm.tiles[0].state, .done(moved: 1, failed: 1))
+        XCTAssertFalse(vm.isMoving)
+    }
+
     func testFailMarksAllNonMissing() {
         let vm = ShelfViewModel()
         vm.reset(folders: [existing, missing], engine: .jev)

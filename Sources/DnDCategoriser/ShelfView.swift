@@ -90,8 +90,10 @@ struct TileView: View {
     }
 
     private var hasMatches: Bool {
-        if case .matches = tile.state { return true }
-        return false
+        switch tile.state {
+        case .matches, .moving, .done: return true
+        default: return false
+        }
     }
 
     private var dimmed: Bool {
@@ -109,6 +111,10 @@ struct TileView: View {
         switch tile.state {
         case .pending: ProgressView().controlSize(.small)
         case .matches(let files): CountBadge(count: files.count)
+        case .moving(_, let total): CountBadge(count: total)
+        case .done(_, let failed):
+            Image(systemName: failed == 0 ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                .foregroundStyle(failed == 0 ? Color.green : Color.orange)
         default: EmptyView()
         }
     }
@@ -121,6 +127,17 @@ struct TileView: View {
             Text("No matching files").font(.caption).foregroundStyle(.secondary)
         case .pending:
             Text("Classifying…").font(.caption).foregroundStyle(.secondary)
+        case .moving(let done, let total):
+            VStack(alignment: .leading, spacing: 3) {
+                Text("Moving \(min(done + 1, total)) of \(total)…").font(.caption).foregroundStyle(.secondary)
+                ProgressView(value: Double(done), total: Double(max(total, 1)))
+                    .progressViewStyle(.linear)
+                    .controlSize(.small)
+            }
+        case .done(let moved, let failed):
+            Text(failed == 0 ? "Moved \(moved)" : "Moved \(moved), \(failed) failed")
+                .font(.caption)
+                .foregroundStyle(failed == 0 ? Color.secondary : Color.orange)
         case .matches, .idle:
             Text(tile.folder.description.isEmpty ? " " : tile.folder.description)
                 .font(.caption).foregroundStyle(.secondary).lineLimit(2)

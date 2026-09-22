@@ -53,6 +53,7 @@ final class ShelfController {
     }
 
     private func dragStarted(_ urls: [URL]) {
+        guard !model.isMoving else { return } // previous drop still moving files; ignore this drag
         hideWork?.cancel()
         classifyTask?.cancel()
 
@@ -80,6 +81,7 @@ final class ShelfController {
     }
 
     private func dragEnded() {
+        guard !model.isMoving else { return } // panel stays until moves finish
         let work = DispatchWorkItem { [weak self] in
             self?.panel.orderOut(nil)
             self?.model.activeIndex = nil
@@ -98,21 +100,44 @@ final class ShelfController {
         model.activeIndex = slot(at: point)
     }
 
-    /// Moves only the files classified for the tile under the pointer. Refuses if not ready, no matches, or "No folder" slot.
+    /// Drop anywhere on the panel: every classified file moves to its folder. Refused while classification is
+    /// still running or failed, or when nothing matched. Moves run off the main thread; tiles show progress;
+    /// the panel hides shortly after the last file lands.
     private func drop(at point: CGPoint) -> Bool {
-        guard let index = slot(at: point) else { return false }
-        guard index < model.tiles.count, let matched = model.matchedFiles(at: index) else {
-            model.flash(index)
+        guard !model.isMoving else { return false }
+        let plan = model.movePlan
+        guard model.isReady, !plan.isEmpty else {
+            for i in model.tiles.indices { model.flash(i) }
             return false
         }
-        let folder = model.tiles[index].folder
-        let result = FileMover.move(matched.map(\.url), into: folder.path)
-        if !result.failed.isEmpty {
-            Notifier.moveFailed(result.failed.keys.map(\.lastPathComponent).sorted())
-        }
         hideWork?.cancel()
-        panel.orderOut(nil)
         model.activeIndex = nil
-        return !result.moved.isEmpty
+        for entry in plan { model.beginMoving(tile: entry.index, total: entry.files.count) }
+
+        let jobs = plan.map { (index: $0.index, urls: $0.files.map(\.url), folder: model.tiles[$0.index].folder.path) }
+        Task.detached(priority: .userInitiated) { [weak self] in
+            var failedNames: [String] = []
+            for job in jobs {
+                let result = FileMover.move(job.urls, into: job.folder) { done, total in
+                    Task { @MainActor [weak self] in self?.model.setProgress(tile: job.index, done: done, total: total) }
+                }
+                failedNames += result.failed.keys.map(\.lastPathComponent)
+                await MainActor.run { [weak self] in
+                    self?.model.finishMoving(tile: job.index, moved: result.moved.count, failed: result.failed.count)
+                }
+            }
+            await MainActor.run { [weak self] in self?.movesFinished(failedNames: failedNames.sorted()) }
+        }
+        return true
+    }
+
+    private func movesFinished(failedNames: [String]) {
+        if !failedNames.isEmpty { Notifier.moveFailed(failedNames) }
+        let work = DispatchWorkItem { [weak self] in
+            self?.panel.orderOut(nil)
+            self?.model.reset(folders: self?.config.config.folders ?? [], engine: self?.config.config.engine ?? .jev)
+        }
+        hideWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6, execute: work)
     }
 }

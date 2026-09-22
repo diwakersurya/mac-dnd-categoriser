@@ -6,9 +6,11 @@ struct MoveResult: Equatable {
 }
 
 enum FileMover {
-    static func move(_ sources: [URL], into folder: URL, fileManager: FileManager = .default) -> MoveResult {
+    /// Moves each source in order. `afterEach(done, total)` fires after every file, on the calling thread.
+    static func move(_ sources: [URL], into folder: URL, fileManager: FileManager = .default,
+                     afterEach: ((Int, Int) -> Void)? = nil) -> MoveResult {
         var result = MoveResult()
-        for source in sources {
+        for (i, source) in sources.enumerated() {
             let destination = availableDestination(for: source, in: folder, fileManager: fileManager)
             do {
                 try fileManager.moveItem(at: source, to: destination)
@@ -16,6 +18,7 @@ enum FileMover {
             } catch {
                 result.failed[source] = error.localizedDescription
             }
+            afterEach?(i + 1, sources.count)
         }
         return result
     }

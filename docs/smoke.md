@@ -11,11 +11,12 @@ descriptions "Supplier invoices, receipts, bills" and "Screenshots and screen re
 - [ ] Invoices shows 1, Screenshots shows 1, a muted "No folder · 1" slot appears for `notes.txt`.
 - [ ] Moving the pointer near a tile (within ~24 pt, not necessarily inside) fills it and a flyout to the left lists its files with icons. Moving onto the flyout keeps it open; dropping there drops on that tile.
 - [ ] Release the mouse away from the shelf: it hides within ~250 ms.
-- [ ] Drag again, drop on Invoices: only the PDF moves. The PNG and TXT remain in `inbox`.
-- [ ] Drop on a dimmed tile (no matches): nothing moves, the shelf hides.
-- [ ] Drop before results arrive (on-device engine makes this easy): tile flashes red, nothing moves.
+- [ ] Drag again, drop anywhere on the panel: the PDF moves to Invoices and the PNG to Screenshots in one go. Each tile shows "Moving n of m" with a bar, then "Moved n" with a green check. `notes.txt` stays in `inbox`. Panel hides ~0.6 s after the last move.
+- [ ] Drop a set where nothing matched any folder: all tiles flash red, nothing moves.
+- [ ] Drop before results arrive (on-device engine makes this easy): tiles flash red, nothing moves.
 - [ ] Drag a file whose name already exists in the target: it lands as `name (2).ext`.
-- [ ] Hover "No folder": flyout lists unmatched files. Dropping on it flashes red, nothing moves.
+- [ ] Hover "No folder": flyout lists unmatched files.
+- [ ] Cross-volume move (e.g. to an external disk): progress bar advances per file; UI stays responsive.
 - [ ] Settings: switch engine, quit, relaunch: choice persisted. Shelf badge shows "Jev" or "On-device".
 - [ ] Settings with no key and engine = Jev: tiles show "Add a TypeSafe API key in Settings"; drop refused.
 - [ ] Remove a folder in Settings: its tile is gone on the next drag.

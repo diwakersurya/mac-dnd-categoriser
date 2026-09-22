@@ -49,6 +49,16 @@ final class FileMoverTests: XCTestCase {
         XCTAssertEqual(result.moved[r]?.lastPathComponent, "README (2)")
     }
 
+    func testAfterEachReportsProgressPerFile() throws {
+        let a = try write("a.txt", in: src)
+        let b = try write("b.txt", in: src)
+        let ghost = src.appendingPathComponent("ghost.txt")
+        var seen: [(Int, Int)] = []
+        _ = FileMover.move([a, ghost, b], into: dest) { done, total in seen.append((done, total)) }
+        XCTAssertEqual(seen.map(\.0), [1, 2, 3])
+        XCTAssertEqual(seen.map(\.1), [3, 3, 3])
+    }
+
     func testMissingSourceIsReportedAndOthersStillMove() throws {
         let a = try write("a.txt", in: src)
         let ghost = src.appendingPathComponent("ghost.txt")
