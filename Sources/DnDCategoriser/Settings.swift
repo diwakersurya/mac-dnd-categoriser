@@ -79,6 +79,17 @@ struct GeneralTab: View {
                 }
             }
 
+            Section("Shelf") {
+                Picker("Appears at", selection: $store.config.edge) {
+                    ForEach(ShelfEdge.allCases) { edge in Text(edge.label).tag(edge) }
+                }
+                .pickerStyle(.segmented)
+                Text(store.config.edge == .top || store.config.edge == .bottom
+                     ? "Tiles form a row along that edge; file names pop out toward the screen centre."
+                     : "Tiles stack along that edge; file names pop out toward the screen centre.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+
             Section("App") {
                 Toggle("Show in Dock", isOn: $store.config.showInDock)
                 Text("Clicking the Dock icon opens this window. Without it: Spotlight → “DnD Categoriser” → Return, or double-click the app.")

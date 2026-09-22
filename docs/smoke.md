@@ -26,3 +26,5 @@ descriptions "Supplier invoices, receipts, bills" and "Screenshots and screen re
 - [ ] Settings → Advanced: edit the task statement; preview updates live; ↺ resets. Toggle "Size" off: `size_kb` disappears from the preview. Turn on "First 512 bytes": preview for a text file shows `snippet`.
 - [ ] Advanced → "Last drag" becomes selectable after one drag and shows those file names.
 - [ ] Advanced → enable request log, drag once, View log shows the request JSON and `f0 → folder` lines with latency.
+- [ ] Settings → General → Shelf → Top: next drag shows a row of tiles along the top edge centred on the pointer; hovering a tile pops names below it. Bottom mirrors upward; Left mirrors Right.
+- [ ] Drop on the transparent area beside/below the shelf: cursor shows no-drop, nothing moves.

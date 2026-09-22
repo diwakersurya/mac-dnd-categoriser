@@ -104,14 +104,16 @@ struct Config: Codable, Equatable {
     var showInDock: Bool = false
     var payload = PayloadTemplate()
     var logRequests: Bool = false
+    var edge: ShelfEdge = .right
 
     init(folders: [Folder] = [], engine: Engine = .jev, showInDock: Bool = false,
-         payload: PayloadTemplate = PayloadTemplate(), logRequests: Bool = false) {
+         payload: PayloadTemplate = PayloadTemplate(), logRequests: Bool = false, edge: ShelfEdge = .right) {
         self.folders = folders
         self.engine = engine
         self.showInDock = showInDock
         self.payload = payload
         self.logRequests = logRequests
+        self.edge = edge
     }
 
     /// Every key optional so a config.json written by an older build still loads.
@@ -122,6 +124,7 @@ struct Config: Codable, Equatable {
         showInDock = try c.decodeIfPresent(Bool.self, forKey: .showInDock) ?? false
         payload = try c.decodeIfPresent(PayloadTemplate.self, forKey: .payload) ?? PayloadTemplate()
         logRequests = try c.decodeIfPresent(Bool.self, forKey: .logRequests) ?? false
+        edge = try c.decodeIfPresent(ShelfEdge.self, forKey: .edge) ?? .right
     }
 }
 

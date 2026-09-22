@@ -14,6 +14,7 @@ final class PayloadTests: XCTestCase {
         let c = try JSONDecoder().decode(Config.self, from: Data(json.utf8))
         XCTAssertEqual(c.payload, PayloadTemplate())
         XCTAssertFalse(c.logRequests)
+        XCTAssertEqual(c.edge, .right)
         XCTAssertEqual(c.payload.fields, [.name, .ext, .size])
         XCTAssertEqual(c.payload.model, "jev-latest")
     }

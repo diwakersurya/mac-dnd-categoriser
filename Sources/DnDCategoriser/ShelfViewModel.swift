@@ -40,13 +40,15 @@ final class ShelfViewModel: ObservableObject {
     @Published var activeIndex: Int?
     @Published var flashIndex: Int?
     @Published var engineLabel: String = ""
+    @Published var layout = TileLayout()
 
     /// Folders whose path exists; these are what the classifier is asked about.
     var activeFolders: [Folder] { tiles.filter { !$0.missing }.map(\.folder) }
     var slotCount: Int { tiles.count + (unmatched.isEmpty ? 0 : 1) }
     var unmatchedSlot: Int? { unmatched.isEmpty ? nil : tiles.count }
 
-    func reset(folders: [Folder], engine: Engine) {
+    func reset(folders: [Folder], engine: Engine, edge: ShelfEdge = .right) {
+        layout = TileLayout(edge: edge)
         tiles = folders.map { folder in
             let exists = FileManager.default.fileExists(atPath: folder.path.path)
             return Tile(folder: folder, state: exists ? .idle : .failed(Self.missingMessage), missing: !exists)

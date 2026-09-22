@@ -7,7 +7,6 @@ final class ShelfController {
     let config: ConfigStore
     let session: SessionLog
     let model = ShelfViewModel()
-    let layout = TileLayout()
     let watcher = DragWatcher()
 
     private let panel: ShelfPanel
@@ -19,8 +18,8 @@ final class ShelfController {
     init(config: ConfigStore, session: SessionLog) {
         self.config = config
         self.session = session
-        panel = ShelfPanel(rootView: ShelfView(model: model, layout: layout), layout: layout)
-        model.reset(folders: config.config.folders, engine: config.config.engine)
+        panel = ShelfPanel(rootView: ShelfView(model: model))
+        model.reset(folders: config.config.folders, engine: config.config.engine, edge: config.config.edge)
 
         // Folder list or engine changed in Settings or via "+": rebuild tiles.
         // If a drag is in flight its results are dropped; the next drag re-classifies.
@@ -29,14 +28,12 @@ final class ShelfController {
             .removeDuplicates()
             .sink { [weak self] cfg in
                 guard let self else { return }
-                self.model.reset(folders: cfg.folders, engine: cfg.engine)
-                if self.panel.isVisible {
-                    self.panel.show(near: NSEvent.mouseLocation, height: self.panelHeight)
-                }
+                self.model.reset(folders: cfg.folders, engine: cfg.engine, edge: cfg.edge)
+                if self.panel.isVisible { self.showPanel() }
             }
             .store(in: &cancellables)
 
-        panel.dropView.onDragMoved = { [weak self] point in self?.pointerMoved(point) }
+        panel.dropView.onDragMoved = { [weak self] point in self?.pointerMoved(point) ?? false }
         panel.dropView.onDragExited = { [weak self] in self?.model.activeIndex = nil }
         panel.dropView.onDrop = { [weak self] point in self?.drop(at: point) ?? false }
 
@@ -45,7 +42,11 @@ final class ShelfController {
         watcher.start()
     }
 
-    private var panelHeight: CGFloat { layout.panelHeight(tileCount: model.slotCount) }
+    private var layout: TileLayout { model.layout }
+
+    private func showPanel() {
+        panel.show(near: NSEvent.mouseLocation, layout: layout, slotCount: model.slotCount)
+    }
 
     private func makeClassifier() -> Classifier {
         let template = config.config.payload
@@ -62,9 +63,9 @@ final class ShelfController {
 
         files = urls.enumerated().map { FileInfo(id: "f\($0.offset)", url: $0.element) }
         session.lastFiles = files
-        model.reset(folders: config.config.folders, engine: config.config.engine)
+        model.reset(folders: config.config.folders, engine: config.config.engine, edge: config.config.edge)
         model.beginSession()
-        panel.show(near: NSEvent.mouseLocation, height: panelHeight)
+        showPanel()
 
         let classifier = makeClassifier()
         let folders = model.activeFolders
@@ -106,21 +107,34 @@ final class ShelfController {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.25, execute: work)
     }
 
-    /// Over the flyout column the current slot stays active, so reading the file list does not drop the highlight.
+    /// Over the flyout side the current slot stays active, so reading the file list does not drop the highlight.
     private func slot(at point: CGPoint) -> Int? {
-        if point.x < layout.shelfX, let current = model.activeIndex { return current }
+        if layout.isOverFlyout(point, slotCount: model.slotCount), let current = model.activeIndex { return current }
         return layout.tileIndex(at: point, tileCount: model.slotCount)
     }
 
-    private func pointerMoved(_ point: CGPoint) {
+    /// Drops land only on the shelf itself (plus its vicinity margin) or on a visible flyout; the rest of the
+    /// transparent panel lets the cursor show "no drop" so files are not swallowed by an invisible region.
+    private func isDroppable(_ point: CGPoint) -> Bool {
+        let shelf = layout.shelfFrame(slotCount: model.slotCount).insetBy(dx: -layout.margin, dy: -layout.margin)
+        if shelf.contains(point) { return true }
+        if let index = model.activeIndex, let content = model.flyout(forSlot: index) {
+            return layout.flyoutFrame(forSlot: index, slotCount: model.slotCount, rowCount: content.files.count).contains(point)
+        }
+        return false
+    }
+
+    /// Returns whether a drop here would be accepted.
+    private func pointerMoved(_ point: CGPoint) -> Bool {
         model.activeIndex = slot(at: point)
+        return isDroppable(point)
     }
 
     /// Drop anywhere on the panel: every classified file moves to its folder. Refused while classification is
     /// still running or failed, or when nothing matched. Moves run off the main thread; tiles show progress;
     /// the panel hides shortly after the last file lands.
     private func drop(at point: CGPoint) -> Bool {
-        guard !model.isMoving else { return false }
+        guard !model.isMoving, isDroppable(point) else { return false }
         let plan = model.movePlan
         guard model.isReady, !plan.isEmpty else {
             for i in model.tiles.indices { model.flash(i) }
@@ -165,7 +179,7 @@ final class ShelfController {
             guard let self else { return }
             self.panel.dismiss(duration: 1.0) { [weak self] in
                 guard let self else { return }
-                self.model.reset(folders: self.config.config.folders, engine: self.config.config.engine)
+                self.model.reset(folders: self.config.config.folders, engine: self.config.config.engine, edge: self.config.config.edge)
             }
         }
         hideWork = work

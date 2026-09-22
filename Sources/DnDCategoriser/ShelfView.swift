@@ -3,11 +3,15 @@ import AppKit
 
 struct ShelfView: View {
     @ObservedObject var model: ShelfViewModel
-    let layout: TileLayout
 
     var body: some View {
+        let layout = model.layout
+        let size = layout.panelSize(slotCount: model.slotCount)
+        let shelf = layout.shelfFrame(slotCount: model.slotCount)
         ZStack(alignment: .topLeading) {
-            shelfColumn.offset(x: layout.shelfX)
+            shelfBody(layout)
+                .frame(width: shelf.width, height: shelf.height)
+                .offset(x: shelf.minX, y: shelf.minY)
 
             if let index = model.activeIndex, let content = model.flyout(forSlot: index) {
                 let f = layout.flyoutFrame(forSlot: index, slotCount: model.slotCount, rowCount: content.files.count)
@@ -17,23 +21,21 @@ struct ShelfView: View {
                     .transition(.opacity)
             }
         }
-        .frame(width: layout.totalWidth, height: layout.panelHeight(tileCount: model.slotCount), alignment: .topLeading)
+        .frame(width: size.width, height: size.height, alignment: .topLeading)
         .animation(.easeOut(duration: 0.12), value: model.activeIndex)
     }
 
-    private var shelfColumn: some View {
-        VStack(spacing: layout.spacing) {
-            ForEach(Array(model.tiles.enumerated()), id: \.element.id) { index, tile in
-                TileView(tile: tile, active: model.activeIndex == index, flashing: model.flashIndex == index)
-                    .frame(height: layout.tileHeight)
-            }
-            if let slot = model.unmatchedSlot {
-                UnmatchedTileView(count: model.unmatched.count, active: model.activeIndex == slot, flashing: model.flashIndex == slot)
-                    .frame(height: layout.tileHeight)
+    @ViewBuilder
+    private func shelfBody(_ layout: TileLayout) -> some View {
+        let tiles = tileViews(layout)
+        Group {
+            if layout.isVertical {
+                VStack(spacing: layout.spacing) { tiles }
+            } else {
+                HStack(spacing: layout.spacing) { tiles }
             }
         }
         .padding(layout.padding)
-        .frame(width: layout.panelWidth)
         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14))
         .overlay(alignment: .topTrailing) {
             Text(model.engineLabel)
@@ -41,6 +43,18 @@ struct ShelfView: View {
                 .foregroundStyle(.secondary)
                 .padding(.trailing, layout.padding + 4)
                 .padding(.top, 2)
+        }
+    }
+
+    @ViewBuilder
+    private func tileViews(_ layout: TileLayout) -> some View {
+        ForEach(Array(model.tiles.enumerated()), id: \.element.id) { index, tile in
+            TileView(tile: tile, active: model.activeIndex == index, flashing: model.flashIndex == index)
+                .frame(width: layout.tileWidth, height: layout.tileHeight)
+        }
+        if let slot = model.unmatchedSlot {
+            UnmatchedTileView(count: model.unmatched.count, active: model.activeIndex == slot, flashing: model.flashIndex == slot)
+                .frame(width: layout.tileWidth, height: layout.tileHeight)
         }
     }
 }

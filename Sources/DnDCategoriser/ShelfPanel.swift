@@ -3,7 +3,8 @@ import SwiftUI
 
 /// Flipped container that owns the drag destination. Points handed to callbacks are top-left origin.
 final class DropHostView: NSView {
-    var onDragMoved: ((CGPoint) -> Void)?
+    /// Returns whether a drop at this point would be accepted; drives the cursor's drop indicator.
+    var onDragMoved: ((CGPoint) -> Bool)?
     var onDragExited: (() -> Void)?
     var onDrop: ((CGPoint) -> Bool)?
 
@@ -21,13 +22,11 @@ final class DropHostView: NSView {
     }
 
     override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
-        onDragMoved?(point(sender))
-        return .move
+        (onDragMoved?(point(sender)) ?? false) ? .move : []
     }
 
     override func draggingUpdated(_ sender: NSDraggingInfo) -> NSDragOperation {
-        onDragMoved?(point(sender))
-        return .move
+        (onDragMoved?(point(sender)) ?? false) ? .move : []
     }
 
     override func draggingExited(_ sender: NSDraggingInfo?) {
@@ -42,8 +41,8 @@ final class DropHostView: NSView {
 final class ShelfPanel: NSPanel {
     let dropView: DropHostView
 
-    init(rootView: some View, layout: TileLayout) {
-        dropView = DropHostView(frame: NSRect(x: 0, y: 0, width: layout.totalWidth, height: 200))
+    init(rootView: some View) {
+        dropView = DropHostView(frame: NSRect(x: 0, y: 0, width: 508, height: 200))
         super.init(
             contentRect: dropView.frame,
             styleMask: [.nonactivatingPanel, .borderless],
@@ -75,16 +74,23 @@ final class ShelfPanel: NSPanel {
 
     private var generation = 0
 
-    /// Shelf column flush with the right edge of the screen under `pointer`, centred on the pointer's Y, clamped to the
-    /// visible frame. First appearance fades and slides in from the edge; while visible it just re-positions.
-    func show(near pointer: NSPoint, height: CGFloat) {
+    /// Shelf flush with the configured screen edge, centred on the pointer along that edge, clamped to the visible
+    /// frame. First appearance fades and slides in from the edge; while visible it just re-positions.
+    func show(near pointer: NSPoint, layout: TileLayout, slotCount: Int) {
         generation += 1
         let screen = NSScreen.screens.first { NSMouseInRect(pointer, $0.frame, false) } ?? NSScreen.main
         guard let visible = screen?.visibleFrame else { return }
-        let width = frame.width
-        var origin = NSPoint(x: visible.maxX - width - 8, y: pointer.y - height / 2)
-        origin.y = min(max(origin.y, visible.minY + 8), visible.maxY - height - 8)
-        let target = NSRect(origin: origin, size: NSSize(width: width, height: height))
+        let size = layout.panelSize(slotCount: slotCount)
+        var origin: NSPoint
+        switch layout.edge {
+        case .right: origin = NSPoint(x: visible.maxX - size.width - 8, y: pointer.y - size.height / 2)
+        case .left: origin = NSPoint(x: visible.minX + 8, y: pointer.y - size.height / 2)
+        case .top: origin = NSPoint(x: pointer.x - size.width / 2, y: visible.maxY - size.height - 8)
+        case .bottom: origin = NSPoint(x: pointer.x - size.width / 2, y: visible.minY + 8)
+        }
+        origin.x = min(max(origin.x, visible.minX + 8), visible.maxX - size.width - 8)
+        origin.y = min(max(origin.y, visible.minY + 8), visible.maxY - size.height - 8)
+        let target = NSRect(origin: origin, size: NSSize(width: size.width, height: size.height))
 
         if isVisible && alphaValue > 0.99 {
             setFrame(target, display: true)
@@ -96,7 +102,7 @@ final class ShelfPanel: NSPanel {
             ctx.duration = 0
             animator().alphaValue = 0
         }
-        setFrame(target.offsetBy(dx: 24, dy: 0), display: false)
+        setFrame(target.offsetBy(dx: layout.slideOffset.dx, dy: layout.slideOffset.dy), display: false)
         orderFrontRegardless()
         NSAnimationContext.runAnimationGroup { ctx in
             ctx.duration = 0.35
