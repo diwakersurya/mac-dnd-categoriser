@@ -126,7 +126,8 @@ final class ShelfController {
                     self?.model.finishMoving(tile: job.index, moved: result.moved.count, failed: result.failed.count)
                 }
             }
-            await MainActor.run { [weak self] in self?.movesFinished(failedNames: failedNames.sorted()) }
+            let failed = failedNames.sorted()
+            await MainActor.run { [weak self] in self?.movesFinished(failedNames: failed) }
         }
         return true
     }
