@@ -46,6 +46,21 @@ final class ConfigStoreTests: XCTestCase {
         XCTAssertTrue(ConfigStore(url: url).config.folders.isEmpty)
     }
 
+    func testDecodesConfigWrittenBeforeShowInDockExisted() throws {
+        let json = #"{"engine":"onDevice","folders":[{"id":"a","name":"A","description":"","path":"file:///tmp/"}]}"#
+        let c = try JSONDecoder().decode(Config.self, from: Data(json.utf8))
+        XCTAssertEqual(c.engine, .onDevice)
+        XCTAssertEqual(c.folders.count, 1)
+        XCTAssertFalse(c.showInDock)
+    }
+
+    func testShowInDockRoundTrips() throws {
+        var c = Config()
+        c.showInDock = true
+        let data = try JSONEncoder().encode(c)
+        XCTAssertTrue(try JSONDecoder().decode(Config.self, from: data).showInDock)
+    }
+
     func testCorruptFileGivesDefaults() throws {
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         try Data("not json".utf8).write(to: url)

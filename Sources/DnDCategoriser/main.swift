@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
@@ -6,10 +7,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var shelf: ShelfController!
     private var statusItem: NSStatusItem!
     private var settings: SettingsWindowController!
+    private var cancellables = Set<AnyCancellable>()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        NSApp.setActivationPolicy(.accessory)
         NSApp.mainMenu = Self.makeMainMenu()
+        config.$config
+            .map(\.showInDock)
+            .removeDuplicates()
+            .sink { NSApp.setActivationPolicy($0 ? .regular : .accessory) }
+            .store(in: &cancellables)
 
         settings = SettingsWindowController(config: config)
         shelf = ShelfController(config: config)

@@ -2,7 +2,7 @@ APP := DnDCategoriser
 BUNDLE := build/$(APP).app
 CONTENTS := $(BUNDLE)/Contents
 
-.PHONY: test app run clean
+.PHONY: test app run install clean
 
 test:
 	swift test
@@ -18,6 +18,11 @@ app:
 
 run: app
 	open $(BUNDLE)
+
+install: app
+	rm -rf /Applications/$(APP).app
+	cp -R $(BUNDLE) /Applications/$(APP).app
+	@echo "Installed /Applications/$(APP).app"
 
 clean:
 	rm -rf build .build

@@ -45,6 +45,21 @@ enum Engine: String, Codable, CaseIterable {
 struct Config: Codable, Equatable {
     var folders: [Folder] = []
     var engine: Engine = .jev
+    var showInDock: Bool = false
+
+    init(folders: [Folder] = [], engine: Engine = .jev, showInDock: Bool = false) {
+        self.folders = folders
+        self.engine = engine
+        self.showInDock = showInDock
+    }
+
+    /// Every key optional so a config.json written by an older build still loads.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        folders = try c.decodeIfPresent([Folder].self, forKey: .folders) ?? []
+        engine = try c.decodeIfPresent(Engine.self, forKey: .engine) ?? .jev
+        showInDock = try c.decodeIfPresent(Bool.self, forKey: .showInDock) ?? false
+    }
 }
 
 enum ClassifierError: Error, Equatable {

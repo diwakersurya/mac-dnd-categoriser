@@ -9,6 +9,7 @@ enum AddFolderFlow {
         open.canChooseDirectories = true
         open.canChooseFiles = false
         open.allowsMultipleSelection = false
+        open.canCreateDirectories = true
         open.prompt = "Choose"
         open.message = "Choose a folder to add to the shelf"
         NSApp.activate(ignoringOtherApps: true)
@@ -59,6 +60,12 @@ struct SettingsView: View {
                 }
             }
 
+            Section("App") {
+                Toggle("Show in Dock", isOn: $store.config.showInDock)
+                Text("Clicking the Dock icon opens this window. Without it: Spotlight → “DnD Categoriser” → Return, or double-click the app.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+
             Section("Folders") {
                 if store.config.folders.isEmpty {
                     Text("No folders yet. Add one below or with the “+” tile on the shelf.")
@@ -87,7 +94,7 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .frame(width: 560, height: 520)
+        .frame(width: 560, height: 600)
     }
 
     private func testKey() {
