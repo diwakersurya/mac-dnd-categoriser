@@ -2,7 +2,7 @@ import Foundation
 import Security
 
 enum KeychainStore {
-    static let service = "ai.typesafe.dnd-categoriser"
+    static let service = "com.dndcategoriser.typesafe-api-key"
     static let account = "api-key"
 
     private static var baseQuery: [String: Any] {
