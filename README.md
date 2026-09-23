@@ -26,19 +26,42 @@ There is no account, no telemetry, no analytics, and no third-party code. See [A
 ## Requirements
 
 - macOS 26 or later, Apple silicon.
-- Xcode 26 (for the Swift 6.2 toolchain). No other dependencies.
+- Xcode 26 (for the Swift 6.2 toolchain), only if you build from source. No other dependencies.
 - For the on-device engine: Apple Intelligence turned on in System Settings.
 - For the Jev engine: a TypeSafe API key.
 
 ## Install
 
+### Download
+
+Grab `DnDCategoriser.zip` from the [latest release](https://github.com/diwakersurya/mac-dnd-categoriser/releases/latest).
+It is ad-hoc signed and not notarized (this is a free app with no paid Apple developer account behind it), so macOS
+blocks the first launch. Two ways past that:
+
+**Terminal, one line.** `curl` downloads carry no quarantine flag, so Gatekeeper never fires:
+
 ```bash
-git clone <this repo>
+curl -fsSL https://github.com/diwakersurya/mac-dnd-categoriser/releases/latest/download/DnDCategoriser.zip -o /tmp/DnDCategoriser.zip && rm -rf /Applications/DnDCategoriser.app && ditto -x -k /tmp/DnDCategoriser.zip /Applications && open /Applications/DnDCategoriser.app
+```
+
+**Finder.** Unzip, drag the app to Applications, open it; macOS says it could not verify the app, click Done. Then
+System Settings → Privacy & Security → scroll down → "DnDCategoriser was blocked" → **Open Anyway**, authenticate,
+and open the app once more. Equivalent shortcut: `xattr -dr com.apple.quarantine /Applications/DnDCategoriser.app`.
+
+Because the release build is ad-hoc signed, each new version counts as a new app to macOS: it asks again for folder
+access and for the Keychain item holding your API key. Building from source with `make cert` avoids that.
+
+### Build from source
+
+```bash
+git clone https://github.com/diwakersurya/mac-dnd-categoriser.git
 cd mac-dnd-categoriser
 make cert      # optional, once: creates a self-signed signing identity (see "Code signing" below)
 make install   # builds and copies DnDCategoriser.app to /Applications, then open it
 open /Applications/DnDCategoriser.app
 ```
+
+### First launch
 
 The app has no Dock icon. Look for a tray icon in the menubar. On first launch, Settings opens automatically because
 no folders are configured yet.
@@ -131,10 +154,23 @@ make test                                  # unit tests, no network, no model
 RUN_ONDEVICE=1 swift test --filter OnDevice  # one test against the real Apple model
 make app                                   # build/DnDCategoriser.app
 make run                                   # build and launch from build/
+make dist                                  # ad-hoc signed build/DnDCategoriser.zip, what a release ships
 ```
 
 Layout, request encoding, file moving and configuration are pure functions or small classes with XCTest coverage.
 The manual checklist for anything involving a real mouse is in `docs/smoke.md`.
+
+### Releasing
+
+Bump `CFBundleShortVersionString` in `Resources/Info.plist`, commit, then tag and push:
+
+```bash
+git tag v0.2.0 && git push origin main v0.2.0
+```
+
+The `Release` workflow runs the tests, builds `make dist` on a macOS 26 runner and publishes a GitHub release with
+`DnDCategoriser.zip` and the install notes from `.github/release-notes.md`. It fails if the tag and the plist version
+disagree.
 
 ## License
 

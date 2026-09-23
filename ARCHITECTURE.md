@@ -162,8 +162,10 @@ logged, never included in the preview or the request log, and never written to `
 that identity is absent. A stable identity matters because Keychain access control and TCC grants are tied to the
 signing identity: with ad-hoc signing every rebuild is a "new app" and macOS re-prompts. The self-signed
 certificate is trusted for code signing only, only on the machine where you created it, and its private key never
-leaves your keychain. It provides no assurance to anyone else; for distribution you would sign with Developer ID
-and notarize.
+leaves your keychain. It provides no assurance to anyone else. Release zips from GitHub are built by `make dist`
+with an ad-hoc signature and are not notarized, so Gatekeeper blocks the first launch until the user opens the app
+via "Open Anyway" or removes the quarantine attribute; the README documents both. Signing with Developer ID and
+notarizing would remove that step but needs a paid developer account.
 
 **Dependencies.** None. Only Apple frameworks (AppKit, SwiftUI, Foundation, FoundationModels, UserNotifications,
 Security, UniformTypeIdentifiers). No package manager resolution step, nothing fetched at build time.
