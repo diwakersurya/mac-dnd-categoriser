@@ -71,7 +71,8 @@ through the same builders, so the preview is what is sent.
 
 ### TypeSafe Jev
 
-`POST https://api.typesafe.ai/v1/systemone` with `Authorization: Bearer <key>`. Jev is a "System One" decision model:
+`POST` to the Jev URL from General (default `https://api.typesafe.ai/v1/systemone`; any server speaking the same API
+works, including localhost) with `Authorization: Bearer <key>` when a key is set. Jev is a "System One" decision model:
 you give it a `state` and a map of typed `questions`; it answers every question in one call with calibrated
 probabilities and cannot return a value outside your schema. The app sends one **Choice** question per dragged
 file, all sharing the same criteria: one key per folder (name + description) plus `none`. Per-file facts are
@@ -93,7 +94,7 @@ embedded in each question's structured `instructions` object and repeated in `st
 }
 ```
 
-Timeout defaults to 3 s. A 429 or 529 is retried once after 400 ms. 401 becomes "API key rejected"; 422 surfaces
+Timeout defaults to 3 s. A 429 or 529 is retried once after 400 ms. 401 becomes "API key missing or rejected"; 422 surfaces
 the server's validation message. Answers naming an unknown folder, or `none`, mean "no folder".
 
 ### Apple on-device
@@ -116,7 +117,7 @@ Everything the app persists, keeps in memory, or transmits.
 
 | Data | Where | Lifetime | Who can read it |
 |---|---|---|---|
-| Folder paths, names, descriptions; engine; shelf edge; Dock toggle; payload template; log toggle | `~/Library/Application Support/DnDCategoriser/config.json`, pretty-printed JSON, written atomically | Until you remove it | Your user account |
+| Folder paths, names, descriptions; engine; shelf edge; Dock toggle; payload template (incl. Jev URL); log toggle | `~/Library/Application Support/DnDCategoriser/config.json`, pretty-printed JSON, written atomically | Until you remove it | Your user account |
 | TypeSafe API key | Login Keychain, generic password, service `com.dndcategoriser.typesafe-api-key`, account `api-key` | Until you clear the field (empty string deletes the item) | This app, after you click "Always Allow" once; other apps prompt you |
 | Dragged file URLs and metadata | Memory only, per drag session | Until the next drag or quit | Nobody else |
 | Request log (opt-in) | Memory only, last 10 entries | Until quit or "Clear" | Nobody else |
@@ -130,11 +131,14 @@ know who you are.
 
 | Destination | When | What |
 |---|---|---|
-| `https://api.typesafe.ai/v1/systemone` | Engine is Jev and a drag with file URLs starts; or you click "Test key" | The request shown in Advanced → Preview: template texts, folder names and descriptions, and the enabled per-file fields. The API key in the Authorization header. |
+| The Jev URL from General (default `https://api.typesafe.ai/v1/systemone`) | Engine is Jev and a drag with file URLs starts; or you click "Test connection" | The request shown in Advanced → Preview: template texts, folder names and descriptions, and the enabled per-file fields. The API key in the Authorization header, if one is set. |
 
-That is the only network endpoint in the codebase. There is no update check, no telemetry, no crash reporter. With
-the on-device engine the app makes no network requests at all. TLS is provided by `URLSession` with system trust;
-no certificate pinning. How TypeSafe stores or uses submitted data is governed by their terms, not by this app.
+That is the only network destination in the codebase, and you choose it. There is no update check, no telemetry, no
+crash reporter. With the on-device engine the app makes no network requests at all. TLS is provided by `URLSession`
+with system trust; no certificate pinning. App Transport Security permits plain `http` only for local networking
+(`NSAllowsLocalNetworking`), so a remote server must be `https`. With the default URL and no key, nothing is sent and
+the shelf reports "Add a TypeSafe API key". With a custom URL the key is optional and the header is omitted when empty.
+How the server's operator stores or uses submitted data is governed by their terms, not by this app.
 
 ## Security model
 

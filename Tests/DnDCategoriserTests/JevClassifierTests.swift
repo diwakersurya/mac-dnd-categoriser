@@ -112,13 +112,40 @@ final class JevClassifierTests: XCTestCase {
         XCTAssertTrue(StubURLProtocol.requests.isEmpty)
     }
 
+    func testCustomEndpointWithoutKeySendsNoAuthorization() async throws {
+        var t = PayloadTemplate()
+        t.endpoint = " http://localhost:8080/v1/systemone "
+        let c = JevClassifier(apiKey: { "" }, session: session, template: t)
+        StubURLProtocol.handler = { _ in
+            (200, self.json(["model": "local", "answers": ["f0": ["type": "choice", "choice": "invoices"]]]))
+        }
+        let result = try await c.classify(files: files, folders: folders)
+        XCTAssertEqual(result, ["f0": "invoices"])
+        let sent = try XCTUnwrap(StubURLProtocol.requests.first)
+        XCTAssertEqual(sent.url?.absoluteString, "http://localhost:8080/v1/systemone")
+        XCTAssertNil(sent.value(forHTTPHeaderField: "Authorization"))
+    }
+
+    func testInvalidEndpointThrowsWithoutNetwork() async {
+        var t = PayloadTemplate()
+        t.endpoint = "localhost:8080/v1/systemone"
+        let c = JevClassifier(apiKey: { "sk-test" }, session: session, template: t)
+        do {
+            _ = try await c.classify(files: files, folders: folders)
+            XCTFail("expected throw")
+        } catch let e as ClassifierError {
+            XCTAssertEqual(e, .notConfigured("Jev URL must start with http:// or https://"))
+        } catch { XCTFail("wrong error \(error)") }
+        XCTAssertTrue(StubURLProtocol.requests.isEmpty)
+    }
+
     func testUnauthorizedMapsToNotConfigured() async {
         StubURLProtocol.handler = { _ in (401, Data()) }
         do {
             _ = try await classifier.classify(files: files, folders: folders)
             XCTFail("expected throw")
         } catch let e as ClassifierError {
-            XCTAssertEqual(e, .notConfigured("API key rejected"))
+            XCTAssertEqual(e, .notConfigured("API key missing or rejected"))
         } catch { XCTFail("wrong error \(error)") }
     }
 

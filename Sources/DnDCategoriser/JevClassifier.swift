@@ -1,6 +1,6 @@
 import Foundation
 
-/// Body for POST https://api.typesafe.ai/v1/systemone.
+/// Body for POST to the configured Jev URL (TypeSafe System One API, default https://api.typesafe.ai/v1/systemone).
 /// One Choice question per file; all questions share the same criteria (one key per folder + "none").
 struct JevRequest: Encodable {
     static let noneKey = "none"
@@ -101,7 +101,6 @@ struct JevResponse: Decodable {
 }
 
 final class JevClassifier: Classifier {
-    let endpoint = URL(string: "https://api.typesafe.ai/v1/systemone")!
     var retryDelayNanos: UInt64 = 400_000_000
 
     private let apiKey: () -> String?
@@ -115,7 +114,13 @@ final class JevClassifier: Classifier {
     }
 
     func classify(files: [FileInfo], folders: [Folder]) async throws -> [String: String] {
-        guard let key = apiKey(), !key.isEmpty else {
+        guard let endpoint = template.endpointURL else {
+            throw ClassifierError.notConfigured("Jev URL must start with http:// or https://")
+        }
+        let key = apiKey()?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        // Hosted TypeSafe always needs a key, so fail before anything leaves the machine.
+        // Other servers decide for themselves; an empty key simply omits the header.
+        if key.isEmpty && template.usesDefaultEndpoint {
             throw ClassifierError.notConfigured("Add a TypeSafe API key in Settings")
         }
         guard !files.isEmpty, !folders.isEmpty else { return [:] }
@@ -123,14 +128,14 @@ final class JevClassifier: Classifier {
         var request = URLRequest(url: endpoint)
         request.httpMethod = "POST"
         request.timeoutInterval = max(0.5, template.timeoutSeconds)
-        request.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization")
+        if !key.isEmpty { request.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization") }
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try JSONEncoder().encode(JevRequest(files: files, folders: folders, template: template))
 
         let (data, status) = try await send(request, allowRetry: true)
         switch status {
         case 200..<300: break
-        case 401: throw ClassifierError.notConfigured("API key rejected")
+        case 401: throw ClassifierError.notConfigured("API key missing or rejected")
         case 422: throw ClassifierError.badRequest(String(decoding: data, as: UTF8.self))
         default: throw ClassifierError.unavailable("HTTP \(status)")
         }

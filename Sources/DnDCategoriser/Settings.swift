@@ -66,15 +66,23 @@ struct GeneralTab: View {
                 .pickerStyle(.radioGroup)
 
                 if store.config.engine == .jev {
-                    SecureField("TypeSafe API key", text: $apiKey)
+                    HStack {
+                        TextField("Jev URL", text: $store.config.payload.endpoint)
+                            .autocorrectionDisabled()
+                        Button { store.config.payload.endpoint = PayloadTemplate.defaultEndpoint } label: { Image(systemName: "arrow.counterclockwise") }
+                            .buttonStyle(.borderless)
+                            .disabled(store.config.payload.endpoint == PayloadTemplate.defaultEndpoint)
+                            .help("Reset to api.typesafe.ai")
+                    }
+                    SecureField("API key", text: $apiKey)
                         .onChange(of: apiKey) { _, newValue in
                             KeychainStore.write(newValue.trimmingCharacters(in: .whitespacesAndNewlines))
                         }
                     HStack {
-                        Button("Test key") { testKey() }
+                        Button("Test connection") { testConnection() }
                         Text(testResult).font(.caption).foregroundStyle(.secondary)
                     }
-                    Text("Get a key at console.typesafe.ai. What is sent per file is listed under Advanced.")
+                    Text("Any server that speaks the TypeSafe System One API works, hosted or on localhost. The key is required for api.typesafe.ai (console.typesafe.ai) and optional elsewhere. Plain http is allowed only for local addresses. What is sent per file is listed under Advanced.")
                         .font(.caption).foregroundStyle(.secondary)
                 }
             }
@@ -99,7 +107,7 @@ struct GeneralTab: View {
         .formStyle(.grouped)
     }
 
-    private func testKey() {
+    private func testConnection() {
         testResult = "Testing…"
         let classifier = JevClassifier(apiKey: { apiKey }, template: store.config.payload)
         let file = PayloadPreview.sampleFiles[0]
@@ -107,7 +115,7 @@ struct GeneralTab: View {
         Task { @MainActor in
             do {
                 let result = try await classifier.classify(files: [file], folders: [folder])
-                testResult = result["f0"] == "invoices" ? "Key works." : "Key works (answer: \(result["f0"] ?? "none"))."
+                testResult = result["f0"] == "invoices" ? "Server answered." : "Server answered (choice: \(result["f0"] ?? "none"))."
             } catch let error as ClassifierError {
                 testResult = error.message
             } catch {
@@ -243,7 +251,9 @@ struct AdvancedTab: View {
                 .frame(height: 220)
                 .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 6))
             } header: {
-                Text(store.config.engine == .jev ? "Exact request to api.typesafe.ai" : "Exact prompt to the on-device model")
+                Text(store.config.engine == .jev
+                     ? "Exact request to \(store.config.payload.endpointURL?.host ?? "the Jev server")"
+                     : "Exact prompt to the on-device model")
             } footer: {
                 Text(session.lastFiles.isEmpty ? "Drag some files once and “Last drag” becomes available." : "“Last drag” uses the \(session.lastFiles.count) file(s) from the most recent shelf session.")
             }

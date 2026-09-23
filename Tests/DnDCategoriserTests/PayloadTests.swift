@@ -17,6 +17,15 @@ final class PayloadTests: XCTestCase {
         XCTAssertEqual(c.edge, .right)
         XCTAssertEqual(c.payload.fields, [.name, .ext, .size])
         XCTAssertEqual(c.payload.model, "jev-latest")
+        XCTAssertEqual(c.payload.endpoint, "https://api.typesafe.ai/v1/systemone")
+    }
+
+    func testPayloadWithoutEndpointKeyKeepsDefault() throws {
+        let json = #"{"payload":{"model":"jev-1.13.0"}}"#
+        let c = try JSONDecoder().decode(Config.self, from: Data(json.utf8))
+        XCTAssertEqual(c.payload.model, "jev-1.13.0")
+        XCTAssertTrue(c.payload.usesDefaultEndpoint)
+        XCTAssertEqual(c.payload.endpointURL?.host, "api.typesafe.ai")
     }
 
     func testPayloadTemplateRoundTrips() throws {

@@ -75,16 +75,29 @@ struct PayloadTemplate: Codable, Equatable {
     static let defaultQuestion = "Which folder is the best home for this file?"
     static let defaultNoneDescription = "Does not belong in any of the listed folders"
     static let defaultModel = "jev-latest"
+    static let defaultEndpoint = "https://api.typesafe.ai/v1/systemone"
     static let defaultFields: Set<FileField> = [.name, .ext, .size]
 
     var task = defaultTask
     var question = defaultQuestion
     var noneDescription = defaultNoneDescription
     var model = defaultModel
+    /// Any server that speaks the TypeSafe System One API: hosted TypeSafe, an alternative, or one on localhost.
+    var endpoint = defaultEndpoint
     var timeoutSeconds: Double = 3
     var fields = defaultFields
 
     init() {}
+
+    /// nil unless the text is an absolute http(s) URL with a host.
+    var endpointURL: URL? {
+        guard let url = URL(string: endpoint.trimmingCharacters(in: .whitespacesAndNewlines)),
+              let scheme = url.scheme?.lowercased(), scheme == "http" || scheme == "https",
+              url.host != nil else { return nil }
+        return url
+    }
+
+    var usesDefaultEndpoint: Bool { endpointURL?.absoluteString == Self.defaultEndpoint }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -92,6 +105,7 @@ struct PayloadTemplate: Codable, Equatable {
         question = try c.decodeIfPresent(String.self, forKey: .question) ?? Self.defaultQuestion
         noneDescription = try c.decodeIfPresent(String.self, forKey: .noneDescription) ?? Self.defaultNoneDescription
         model = try c.decodeIfPresent(String.self, forKey: .model) ?? Self.defaultModel
+        endpoint = try c.decodeIfPresent(String.self, forKey: .endpoint) ?? Self.defaultEndpoint
         timeoutSeconds = try c.decodeIfPresent(Double.self, forKey: .timeoutSeconds) ?? 3
         fields = try c.decodeIfPresent(Set<FileField>.self, forKey: .fields) ?? Self.defaultFields
         fields.insert(.name)

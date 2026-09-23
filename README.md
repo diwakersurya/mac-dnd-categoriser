@@ -19,7 +19,7 @@ tile, and lists the file names when you hover a tile. Drop anywhere on the shelf
 Two classification engines, chosen in Settings:
 
 - **Apple on-device** (default recommendation): Apple's Foundation Models framework, fully offline, about one to three seconds. Requires Apple Intelligence to be enabled on the Mac.
-- **TypeSafe Jev**: a cloud decision model, about a hundred milliseconds. Requires your own API key from [console.typesafe.ai](https://console.typesafe.ai). Only file names, extensions and sizes leave your machine unless you opt into more under Advanced.
+- **TypeSafe Jev**: a cloud decision model, about a hundred milliseconds. Requires your own API key from [console.typesafe.ai](https://console.typesafe.ai), or point the app at any other server that speaks the same System One API, including one running on your own machine. Only file names, extensions and sizes leave your machine unless you opt into more under Advanced.
 
 There is no account, no telemetry, no analytics, and no third-party code. See [ARCHITECTURE.md](ARCHITECTURE.md) for how it works and exactly what is stored and sent.
 
@@ -73,8 +73,11 @@ Open Settings from the menubar icon, or if the menubar is too crowded to show th
 ### General tab
 
 - **Engine**: Apple on-device or TypeSafe Jev.
-- **TypeSafe API key**: shown only when Jev is selected. Stored in your login Keychain, never in a file.
-  "Test key" sends one sample request and reports the result.
+- **Jev URL**: shown only when Jev is selected. Defaults to `https://api.typesafe.ai/v1/systemone`. Point it at any
+  server that speaks the TypeSafe System One API, hosted or local, e.g. `http://localhost:8080/v1/systemone`.
+  Plain `http` is allowed only for localhost and local-network addresses; remote servers must use `https`.
+- **API key**: stored in your login Keychain, never in a file. Required for api.typesafe.ai, optional for other
+  servers (sent as `Authorization: Bearer` when set). "Test connection" sends one sample request and reports the result.
 - **Shelf appears at**: Top, Right, Bottom or Left. Vertical edges stack tiles in a column; horizontal edges lay them
   in a row. File names pop out toward the screen centre.
 - **Show in Dock**: adds a Dock icon that opens Settings when clicked.
@@ -140,7 +143,8 @@ MIT. See [LICENSE](LICENSE).
 
 Folder paths and descriptions live in `~/Library/Application Support/DnDCategoriser/config.json`. The TypeSafe API key
 lives in your login Keychain. Nothing else is written to disk. With the on-device engine nothing leaves the Mac.
-With the Jev engine, file names, extensions and sizes (plus whatever you enable under Advanced) are sent over HTTPS to
-`api.typesafe.ai` when a drag starts; TypeSafe's handling of that data is governed by their terms. The app reads the
+With the Jev engine, file names, extensions and sizes (plus whatever you enable under Advanced) are sent to the Jev URL
+you configured (`api.typesafe.ai` by default) when a drag starts; that server's handling of the data is governed by its
+operator's terms. The app reads the
 system drag pasteboard to learn which files you are dragging; it never reads keyboard input and needs no Accessibility
 permission. Details in [ARCHITECTURE.md](ARCHITECTURE.md).
