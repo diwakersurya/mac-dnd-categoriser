@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DnD Categoriser</title>
+<meta name="description" content="Drag files anywhere on your Mac, a shelf of your folders appears, each tile shows how many of the dragged files belong there. Drop once, everything lands in the right place.">
+<link rel="icon" href="icon.png">
+<meta property="og:title" content="DnD Categoriser">
+<meta property="og:description" content="Drag files, see where they belong, drop once. A macOS menubar app that sorts dragged files into your folders.">
+<meta property="og:image" content="https://diwakersurya.github.io/mac-dnd-categoriser/icon.png">
+<style>
+  :root {
+    --bg: #f6f6f8; --fg: #1c1c1e; --muted: #6e6e73; --card: #ffffff; --line: #e3e3e8;
+    --accent: #4f5bd5; --accent-fg: #ffffff; --tile: #ffffff; --shelf: #ececf1; --code: #f0f0f4;
+    --radius: 14px; --max: 960px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #101014; --fg: #f2f2f5; --muted: #9a9aa3; --card: #1a1a20; --line: #2a2a32;
+      --accent: #7c86ff; --accent-fg: #0e0e14; --tile: #22222a; --shelf: #17171d; --code: #1f1f27;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--fg); }
+  body { font: 16px/1.55 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code, pre { font: 13px/1.5 ui-monospace, "SF Mono", Menlo, monospace; }
+  code { background: var(--code); padding: 1px 6px; border-radius: 6px; }
+  pre { background: var(--code); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; overflow-x: auto; margin: 0; }
+  pre code { background: none; padding: 0; }
+  .wrap { max-width: var(--max); margin: 0 auto; padding: 0 16px; }
+  header { padding: 72px 0 40px; text-align: center; }
+  header img { width: 128px; height: 128px; display: block; margin: 0 auto 20px; }
+  h1 { font-size: 44px; line-height: 1.1; letter-spacing: -0.02em; margin: 0 0 12px; }
+  .tagline { font-size: 20px; color: var(--muted); max-width: 620px; margin: 0 auto 28px; }
+  .cta { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+  .btn { display: inline-block; padding: 12px 22px; border-radius: 999px; font-weight: 600; border: 1px solid var(--line); background: var(--card); color: var(--fg); }
+  .btn.primary { background: var(--accent); color: var(--accent-fg); border-color: transparent; }
+  .btn:hover { text-decoration: none; filter: brightness(1.05); }
+  .req { font-size: 13px; color: var(--muted); margin-top: 14px; }
+  section { padding: 40px 0; border-top: 1px solid var(--line); }
+  h2 { font-size: 26px; letter-spacing: -0.01em; margin: 0 0 20px; }
+  h3 { font-size: 17px; margin: 0 0 6px; }
+  p { margin: 0 0 12px; }
+  .muted { color: var(--muted); }
+  .grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 20px; }
+  .card p { margin: 0; color: var(--muted); }
+  .steps { counter-reset: step; }
+  .steps .card { position: relative; padding-left: 60px; }
+  .steps .card::before { counter-increment: step; content: counter(step); position: absolute; left: 20px; top: 20px; width: 28px; height: 28px; border-radius: 50%; background: var(--accent); color: var(--accent-fg); font-weight: 700; display: grid; place-items: center; font-size: 14px; }
+
+  /* CSS mock of the shelf */
+  .demo { display: flex; justify-content: center; margin: 32px 0 8px; }
+  .shelf { background: var(--shelf); border: 1px solid var(--line); border-radius: 18px; padding: 12px; display: flex; flex-direction: column; gap: 8px; width: 260px; box-shadow: 0 20px 50px rgba(0,0,0,.12); }
+  .tile { background: var(--tile); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .tile.hit { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+  .tile.dim { opacity: .45; }
+  .tile .name { font-weight: 600; font-size: 14px; }
+  .tile .desc { font-size: 12px; color: var(--muted); }
+  .badge { background: var(--accent); color: var(--accent-fg); font-size: 12px; font-weight: 700; border-radius: 999px; padding: 2px 9px; min-width: 24px; text-align: center; }
+  .bar { height: 4px; border-radius: 2px; background: var(--line); margin-top: 8px; overflow: hidden; }
+  .bar i { display: block; height: 100%; width: 60%; background: var(--accent); }
+  .caption { text-align: center; color: var(--muted); font-size: 13px; }
+
+  .notice { border-left: 3px solid var(--accent); padding: 10px 14px; background: var(--card); border-radius: 0 10px 10px 0; margin: 16px 0; }
+  ol, ul { padding-left: 22px; margin: 0 0 12px; }
+  li { margin-bottom: 6px; }
+  footer { padding: 32px 0 48px; border-top: 1px solid var(--line); color: var(--muted); font-size: 14px; text-align: center; }
+  @media (max-width: 600px) { h1 { font-size: 34px; } .tagline { font-size: 17px; } header { padding-top: 48px; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <img src="icon.png" alt="DnD Categoriser icon" width="128" height="128">
+  <h1>DnD Categoriser</h1>
+  <p class="tagline">Drag files anywhere. A shelf of your folders slides in, each tile shows how many of the dragged files belong there. Drop once, everything lands in the right place.</p>
+  <div class="cta">
+    <a class="btn primary" href="https://github.com/diwakersurya/mac-dnd-categoriser/releases/latest/download/DnDCategoriser.zip">Download for macOS</a>
+    <a class="btn" href="https://github.com/diwakersurya/mac-dnd-categoriser">Source on GitHub</a>
+  </div>
+  <p class="req">macOS 26 or later, Apple silicon. Free, MIT licensed.</p>
+
+  <div class="demo" aria-hidden="true">
+    <div class="shelf">
+      <div class="tile hit"><div><div class="name">Invoices</div><div class="desc">Supplier invoices, receipts, bills</div></div><span class="badge">3</span></div>
+      <div class="tile hit"><div><div class="name">Bug Screenshots</div><div class="desc">Screenshots for bug reports</div><div class="bar"><i></i></div></div><span class="badge">2</span></div>
+      <div class="tile dim"><div><div class="name">Contracts</div><div class="desc">Signed agreements and NDAs</div></div></div>
+      <div class="tile dim"><div><div class="name">No folder</div><div class="desc">Stays where it is</div></div><span class="badge" style="background:var(--line);color:var(--muted)">1</span></div>
+    </div>
+  </div>
+  <p class="caption">The shelf, mid-drag. Counts update before you reach a tile. Hover a tile to see the file names.</p>
+</header>
+
+<section id="how">
+  <h2>How it works</h2>
+  <div class="grid steps">
+    <div class="card"><h3>Describe your folders</h3><p>Add folders in Settings and write one line about what belongs in each: "Supplier invoices, receipts, bills" beats "Finance". That text is what the classifier reads.</p></div>
+    <div class="card"><h3>Drag from anywhere</h3><p>Start dragging files in Finder or any app. The shelf slides in from the edge you chose. Every matching tile lights up with a count while you are still dragging.</p></div>
+    <div class="card"><h3>Drop once</h3><p>Drop anywhere on the shelf. Each tile shows a progress bar as its files move, then "Moved n". Files that match nothing stay where they were.</p></div>
+  </div>
+</section>
+
+<section id="features">
+  <h2>Details that matter</h2>
+  <div class="grid">
+    <div class="card"><h3>Two engines</h3><p><strong>TypeSafe Jev</strong>, a cloud decision model that answers in about a hundred milliseconds, or <strong>Apple's on-device model</strong>, fully offline, one to three seconds. Switch in Settings.</p></div>
+    <div class="card"><h3>Bring your own server</h3><p>The Jev URL is configurable. Point it at api.typesafe.ai, an open alternative, or a compatible server on localhost. The API key is optional for anything but hosted TypeSafe.</p></div>
+    <div class="card"><h3>Metadata only</h3><p>By default only file name, extension and size leave your Mac. Kind, dates, parent folder and a 512-byte text snippet are opt-in, each labelled with what it reveals.</p></div>
+    <div class="card"><h3>See the exact payload</h3><p>Advanced settings show the request as it will be sent, with your folders and either sample files or your last drag. Edit the template, copy it, or keep a memory-only log of the last ten requests.</p></div>
+    <div class="card"><h3>Nothing stored but your folders</h3><p>Folder paths and descriptions live in one JSON file. The API key lives in your login Keychain. No accounts, no telemetry, no update pings, no history of what you moved.</p></div>
+    <div class="card"><h3>Stays out of the way</h3><p>Menubar only, no Dock icon unless you want one. Shelf from top, right, bottom or left. Name collisions become <code>name (2).ext</code>, never overwrites. Folders in a drag are ignored.</p></div>
+  </div>
+</section>
+
+<section id="install">
+  <h2>Install</h2>
+  <p>This is a free app without a paid Apple developer account behind it, so the download is not notarized and macOS blocks the first launch. Two ways past that, pick one.</p>
+
+  <h3>Terminal, one line</h3>
+  <p class="muted"><code>curl</code> downloads carry no quarantine flag, so Gatekeeper never fires.</p>
+  <pre><code>curl -fsSL https://github.com/diwakersurya/mac-dnd-categoriser/releases/latest/download/DnDCategoriser.zip -o /tmp/DnDCategoriser.zip &amp;&amp; rm -rf /Applications/DnDCategoriser.app &amp;&amp; ditto -x -k /tmp/DnDCategoriser.zip /Applications &amp;&amp; open /Applications/DnDCategoriser.app</code></pre>
+
+  <h3 style="margin-top:20px">Finder</h3>
+  <ol>
+    <li>Download, unzip, drag <code>DnDCategoriser.app</code> to Applications and open it. macOS says it could not verify the app. Click Done.</li>
+    <li>System Settings → Privacy &amp; Security → scroll down → "DnDCategoriser was blocked" → <strong>Open Anyway</strong>, then authenticate.</li>
+    <li>Open the app again and confirm.</li>
+  </ol>
+  <p class="muted">Shortcut for the same thing: <code>xattr -dr com.apple.quarantine /Applications/DnDCategoriser.app</code></p>
+
+  <div class="notice">
+    <strong>First launch.</strong> The app lives in the menubar and opens Settings because no folders exist yet. macOS asks once per folder before the app may move files into Desktop, Documents or Downloads. Prefer building from source? <code>git clone</code>, then <code>make cert &amp;&amp; make install</code>. The README has the details.
+  </div>
+</section>
+
+<section id="privacy">
+  <h2>Privacy</h2>
+  <p>With the on-device engine nothing leaves your Mac. With Jev, the request you can inspect under Advanced is sent to the server you configured when a drag starts, nothing else, nowhere else. There is one network destination in the whole codebase and you choose it. The full data inventory, network table and security model are in <a href="https://github.com/diwakersurya/mac-dnd-categoriser/blob/main/ARCHITECTURE.md">ARCHITECTURE.md</a>.</p>
+</section>
+
+</div>
+<footer>
+  <div class="wrap">MIT licensed. <a href="https://github.com/diwakersurya/mac-dnd-categoriser">Source</a> · <a href="https://github.com/diwakersurya/mac-dnd-categoriser/releases">Releases</a> · <a href="https://github.com/diwakersurya/mac-dnd-categoriser/blob/main/README.md">Configuration guide</a></div>
+</footer>
+</body>
+</html>

@@ -7,7 +7,7 @@ SIGN_IDENTITY ?= $(shell security find-identity -v -p codesigning 2>/dev/null | 
 VERSION := $(shell /usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' Resources/Info.plist)
 ZIP := build/$(APP).zip
 
-.PHONY: test app run install cert dist icon clean
+.PHONY: test app run install cert dist icon site clean
 
 cert:
 	./scripts/make-cert.sh
@@ -43,6 +43,10 @@ dist:
 	rm -f $(ZIP)
 	ditto -c -k --keepParent $(BUNDLE) $(ZIP)
 	@echo "Built $(ZIP) (version $(VERSION))"
+
+# Preview the GitHub Pages site locally.
+site:
+	open http://localhost:8000 && python3 -m http.server 8000 -d site
 
 clean:
 	rm -rf build .build
