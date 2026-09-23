@@ -7,10 +7,14 @@ SIGN_IDENTITY ?= $(shell security find-identity -v -p codesigning 2>/dev/null | 
 VERSION := $(shell /usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' Resources/Info.plist)
 ZIP := build/$(APP).zip
 
-.PHONY: test app run install cert dist clean
+.PHONY: test app run install cert dist icon clean
 
 cert:
 	./scripts/make-cert.sh
+
+# Regenerate Resources/AppIcon.icns from a 1024px PNG: make icon ICON=path/to.png
+icon:
+	swift scripts/make-icon.swift $(ICON)
 
 test:
 	swift test
@@ -21,6 +25,7 @@ app:
 	mkdir -p $(CONTENTS)/MacOS $(CONTENTS)/Resources
 	cp .build/release/$(APP) $(CONTENTS)/MacOS/$(APP)
 	cp Resources/Info.plist $(CONTENTS)/Info.plist
+	cp Resources/AppIcon.icns $(CONTENTS)/Resources/AppIcon.icns
 	codesign --force --deep --sign "$(SIGN_IDENTITY)" $(BUNDLE)
 	@echo "Built $(BUNDLE) signed with '$(SIGN_IDENTITY)'"
 

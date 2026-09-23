@@ -1,5 +1,7 @@
 # DnD Categoriser
 
+<img src="Resources/AppIcon-256.png" width="128" alt="DnD Categoriser icon">
+
 A menubar app for macOS. Start dragging files anywhere; a shelf of folder tiles slides in from a screen edge.
 Each tile is a real folder you have described in words ("supplier invoices, receipts, bills"). While you are still
 dragging, the app decides which of the dragged files belong to which folder, shows a count on every matching
