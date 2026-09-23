@@ -41,8 +41,9 @@ moving, configuration) lives in small files with unit tests.
 1. **Detection.** `DragWatcher` installs a global monitor for `leftMouseDragged` events. Mouse monitors do not need
    the Accessibility permission (keyboard monitors would; there are none). On each event it compares the
    `changeCount` of the system drag pasteboard (`NSPasteboard(name: .drag)`) with the last value. A new count with
-   at least one file URL means a new drag session; the URLs are read once. Drags without file URLs (text, images from
-   a browser) are ignored. End of drag is detected by polling `NSEvent.pressedMouseButtons` every 100 ms.
+   at least one file URL means a new drag session; the URLs are read once. Directories are dropped from the list
+   (packages such as `.app` are kept, matching Finder), so folders are never classified or moved. Drags without
+   file URLs (text, images from a browser) are ignored. End of drag is detected by polling `NSEvent.pressedMouseButtons` every 100 ms.
 2. **Shelf.** `ShelfController` builds `FileInfo` values (name, extension, size) for the dragged URLs, resets the
    tiles from the configured folders, and shows the panel flush with the configured screen edge, centred on the
    pointer, with a 0.35 s fade-and-slide. The panel is an `NSPanel` with `.nonactivatingPanel`, floating level,

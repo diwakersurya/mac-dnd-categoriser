@@ -32,7 +32,14 @@ final class DragWatcher {
     }
 
     static func fileURLs(from pb: NSPasteboard) -> [URL] {
-        (pb.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL]) ?? []
+        let urls = (pb.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL]) ?? []
+        return urls.filter(isFile)
+    }
+
+    /// Folders are never classified or moved. Packages (.app, .rtfd, .key) show as single items in Finder, so they count as files.
+    static func isFile(_ url: URL) -> Bool {
+        let v = try? url.resourceValues(forKeys: [.isDirectoryKey, .isPackageKey])
+        return !(v?.isDirectory ?? false) || (v?.isPackage ?? false)
     }
 
     private func checkForNewDrag() {

@@ -99,7 +99,8 @@ Everything the classifier receives is built from a template you can edit here, a
 
 ## Use
 
-1. Select files in Finder (or any app that drags file URLs) and start dragging.
+1. Select files in Finder (or any app that drags file URLs) and start dragging. Folders in the selection are
+   ignored and never moved; packages such as `.app` or `.key` count as files.
 2. The shelf slides in from the configured edge. Tiles show a spinner, then a count and an accent border on every
    tile that received files. Files matching nothing appear under a muted "No folder" tile.
 3. Move the pointer near a tile to see its file names. You do not have to be exactly inside the tile.
